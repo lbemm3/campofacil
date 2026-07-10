@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CampoFácil · Versão web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --verde: #345E3B;
+    --verde-escuro: #223C27;
+    --verde-claro: #5C8A62;
+    --terra: #8B4226;
+    --terra-clara: #B2643A;
+    --trigo: #E3A93A;
+    --trigo-escuro: #C68A22;
+    --lona: #F2ECDA;
+    --lona-alt: #E9E1C8;
+    --tinta: #2A2118;
+    --tinta-suave: #5A5041;
+    --zinco: #7C8580;
+    --zinco-claro: #D8DCD2;
+    --branco: #FFFCF5;
+    --perigo: #A6402D;
+    --sucesso: #3F7D4A;
+    --sombra: 0 18px 44px rgba(34,60,39,0.24);
+    --sombra-sm: 0 4px 10px rgba(42,33,24,0.12);
+    --raio-sm: 10px;
+    --raio-md: 16px;
+    --raio-lg: 26px;
+    --fonte-titulo: 'Archivo', sans-serif;
+    --fonte-corpo: 'Public Sans', sans-serif;
+    --fonte-dados: 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family: var(--fonte-corpo);
+    color: var(--tinta);
+    background: var(--lona);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button{ font-family:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+  input, textarea{ font-family:inherit; font-size:15px; }
+  :focus-visible{ outline:3px solid var(--trigo); outline-offset:2px; border-radius:6px; }
+  @media (prefers-reduced-motion: reduce){ *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; } }
+  .oculto{ display:none !important; }
+
+  /* ================= LOGIN (página cheia) ================= */
+  #pagina-login{
+    position:fixed; inset:0; z-index:60;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+    background-color: var(--verde-escuro);
+    background-image:
+      repeating-linear-gradient(155deg, rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 2px, transparent 2px, transparent 32px),
+      linear-gradient(160deg, #3B6B43 0%, #1E3623 100%);
+  }
+  .cartao-login{
+    background: var(--branco);
+    width:100%; max-width:420px;
+    border-radius: var(--raio-lg);
+    padding:40px 34px;
+    text-align:center;
+    box-shadow: var(--sombra);
+  }
+  .cartao-login .selo-grande{
+    width:74px; height:74px; margin:0 auto 18px;
+    background: var(--trigo); border-radius:20px;
+    display:flex; align-items:center; justify-content:center;
+    color: var(--verde-escuro); transform: rotate(-5deg);
+  }
+  .cartao-login .selo-grande svg{ width:36px; height:36px; }
+  .cartao-login h1{ font-family: var(--fonte-titulo); font-weight:900; font-size:27px; margin-bottom:8px; }
+  .cartao-login .tagline{ color: var(--tinta-suave); font-size:14.5px; line-height:1.5; margin-bottom:26px; }
+
+  /* ================= ESTRUTURA GERAL ================= */
+  #aplicativo{ display:flex; height:100vh; }
+
+  .barra-lateral{
+    display:none;
+    width:248px; flex-shrink:0;
+    background: linear-gradient(180deg, var(--verde) 0%, var(--verde-escuro) 100%);
+    color: var(--lona);
+    flex-direction:column;
+    padding:26px 18px;
+  }
+  .barra-lateral .lockup{ display:flex; align-items:center; gap:10px; padding:0 6px 30px; }
+  .barra-lateral .lockup .selo-icone{ width:36px; height:36px; background:var(--trigo); border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--verde-escuro); transform:rotate(-4deg); flex-shrink:0; }
+  .barra-lateral .lockup .nome{ font-family:var(--fonte-titulo); font-weight:900; font-size:19px; }
+  .barra-lateral .lockup .sub{ font-size:10.5px; font-family:var(--fonte-dados); text-transform:uppercase; letter-spacing:0.5px; color:rgba(242,236,218,0.65); }
+  .nav-lateral{ display:flex; flex-direction:column; gap:4px; flex:1; }
+  .nav-lateral button{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px; font-weight:700; font-size:14.5px; color: rgba(242,236,218,0.8); text-align:left; transition: background 0.15s ease, color 0.15s ease; }
+  .nav-lateral button svg{ width:19px; height:19px; flex-shrink:0; }
+  .nav-lateral button:hover{ background: rgba(255,255,255,0.08); }
+  .nav-lateral button.ativo{ background: rgba(255,255,255,0.16); color: var(--branco); }
+  .rodape-lateral{ padding-top:16px; border-top:1px dashed rgba(242,236,218,0.25); }
+  .rodape-lateral button{ display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:12px; font-weight:700; font-size:13.5px; color: rgba(242,236,218,0.68); width:100%; text-align:left; }
+  .rodape-lateral button svg{ width:17px; height:17px; }
+  .rodape-lateral button:hover{ background: rgba(255,255,255,0.08); color:var(--branco); }
+
+  @media (min-width:900px){ .barra-lateral{ display:flex; } }
+
+  .coluna-principal{ flex:1; min-width:0; display:flex; flex-direction:column; height:100vh; }
+
+  .barra-topo{
+    flex-shrink:0; display:flex; align-items:center; gap:16px;
+    padding:16px 28px; background: var(--branco);
+    border-bottom:1.5px solid var(--zinco-claro);
+  }
+  .barra-topo .logo-mobile{ display:flex; align-items:center; gap:9px; flex-shrink:0; }
+  .barra-topo .logo-mobile .selo-icone{ width:32px; height:32px; background:var(--trigo); border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--verde-escuro); transform:rotate(-4deg); }
+  .barra-topo .logo-mobile .nome{ font-family:var(--fonte-titulo); font-weight:900; font-size:16.5px; }
+  @media (min-width:900px){ .barra-topo .logo-mobile{ display:none; } }
+
+  .campo-busca-topo{
+    flex:1; max-width:520px;
+    display:flex; align-items:center; gap:10px;
+    background: var(--lona-alt); border:1.5px solid var(--zinco-claro);
+    border-radius: 999px; padding:11px 16px;
+  }
+  .campo-busca-topo svg{ width:18px; height:18px; color:var(--zinco); flex-shrink:0; }
+  .campo-busca-topo input{ border:none; outline:none; background:transparent; flex:1; font-size:14.5px; color:var(--tinta); }
+  .sino-topo{ width:38px; height:38px; border-radius:50%; background: var(--lona-alt); color:var(--verde); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .sino-topo svg{ width:19px; height:19px; }
+
+  .area-conteudo{ flex:1; overflow-y:auto; padding: 30px 30px 110px; }
+  @media (min-width:900px){ .area-conteudo{ padding: 34px 40px 40px; } }
+
+  .painel-tela{ display:none; max-width:1180px; }
+  .painel-tela.ativa{ display:block; animation: entra 0.22s ease; }
+  @keyframes entra{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:translateY(0);} }
+
+  .saudacao{ font-family: var(--fonte-titulo); font-weight:900; font-size:27px; margin-bottom:4px; }
+  .legenda-muted{ color: var(--tinta-suave); font-size:14.5px; margin-bottom:26px; }
+  .rotulo-secao{ font-family: var(--fonte-titulo); font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:0.6px; color: var(--terra); margin: 4px 0 14px; }
+
+  .cabecalho-resultados{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+  .cabecalho-resultados h2{ font-family: var(--fonte-titulo); font-weight:800; font-size:19px; }
+  .chip-limpar{ font-size:13px; font-weight:700; color: var(--verde); display:flex; align-items:center; gap:5px; }
+  .chip-limpar svg{ width:15px; height:15px; }
+
+  .grade-categorias{ display:grid; grid-template-columns: repeat(auto-fill, minmax(122px, 1fr)); gap:14px; margin-bottom:38px; max-width:1040px; }
+  .cat-botao{
+    background: var(--branco); border:1.5px solid var(--zinco-claro); border-radius: var(--raio-md);
+    padding:18px 8px 14px; display:flex; flex-direction:column; align-items:center; gap:9px; text-align:center;
+    transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+  }
+  .cat-botao:hover{ border-color: var(--verde); box-shadow: var(--sombra-sm); transform: translateY(-2px); }
+  .cat-botao:active{ transform: scale(0.96); }
+  .cat-botao .ic{ width:46px; height:46px; border-radius:13px; background: var(--lona-alt); color: var(--verde); display:flex; align-items:center; justify-content:center; }
+  .cat-botao .ic svg{ width:24px; height:24px; }
+  .cat-botao .rot{ font-size:13px; font-weight:700; line-height:1.2; }
+
+  .grade-prestadores{ display:grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap:16px; max-width:1200px; }
+
+  .cartao-prestador{
+    display:flex; gap:13px; background: var(--branco); border:1.5px solid var(--zinco-claro);
+    border-radius: var(--raio-md); padding:16px; text-align:left; width:100%;
+    transition: border-color 0.14s ease, transform 0.14s ease, box-shadow 0.14s ease;
+  }
+  .cartao-prestador:hover{ border-color: var(--verde); box-shadow: var(--sombra-sm); transform: translateY(-2px); }
+  .cartao-prestador:active{ transform: scale(0.98); }
+  .avatar{ width:52px; height:52px; border-radius:50%; background: var(--verde); color: var(--lona); font-family: var(--fonte-titulo); font-weight:800; font-size:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .info-prestador{ flex:1; min-width:0; }
+  .info-prestador .linha1{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .info-prestador .nome{ font-weight:800; font-size:15px; }
+  .info-prestador .categoria-tag{ font-size:12px; color: var(--tinta-suave); margin-top:1px; }
+  .info-prestador .meta{ display:flex; align-items:center; gap:10px; margin-top:8px; font-size:12.5px; color: var(--tinta-suave); flex-wrap:wrap; }
+  .info-prestador .meta .item{ display:flex; align-items:center; gap:4px; }
+  .info-prestador .meta svg{ width:14px; height:14px; }
+  .estrela{ color: var(--trigo-escuro); }
+
+  .selo-verificado{ display:inline-flex; align-items:center; gap:4px; background: var(--terra); color: var(--branco); font-size:10px; font-weight:800; padding:3px 8px 3px 6px; border-radius:999px; border:1px dashed rgba(255,252,245,0.55); transform: rotate(-3deg); letter-spacing:0.3px; text-transform:uppercase; flex-shrink:0; }
+  .selo-verificado svg{ width:11px; height:11px; }
+
+  .estado-vazio{ text-align:center; padding: 60px 14px; color: var(--tinta-suave); }
+  .estado-vazio .ic{ width:68px; height:68px; margin:0 auto 18px; border-radius:50%; background: var(--lona-alt); color: var(--terra); display:flex; align-items:center; justify-content:center; }
+  .estado-vazio .ic svg{ width:32px; height:32px; }
+  .estado-vazio p{ font-size:14.5px; line-height:1.55; max-width:340px; margin:0 auto 20px; }
+
+  .botao{ display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:14px 22px; border-radius:999px; font-weight:800; font-size:14.5px; transition: transform 0.12s ease, filter 0.12s ease; }
+  .botao:active{ transform: scale(0.97); }
+  .botao svg{ width:18px; height:18px; }
+  .botao-primario{ background: var(--verde); color: var(--branco); }
+  .botao-primario:hover{ filter: brightness(1.08); }
+  .botao-trigo{ background: var(--trigo); color: var(--verde-escuro); width:100%; }
+  .botao-trigo:hover{ filter: brightness(1.05); }
+  .botao-secundario{ background: var(--lona-alt); color: var(--tinta); border:1.5px solid var(--zinco-claro); }
+  .botao-bloco{ width:100%; }
+
+  .cartao{ background: var(--branco); border:1.5px solid var(--zinco-claro); border-radius: var(--raio-md); padding:16px; margin-bottom:14px; }
+  .linha-tracejada{ border-top:1.5px dashed var(--zinco-claro); margin:16px 0; }
+
+  .grupo-campo{ margin-bottom:16px; text-align:left; }
+  .grupo-campo label{ display:block; font-size:12.5px; font-weight:700; color: var(--tinta-suave); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px; }
+  .grupo-campo input, .grupo-campo textarea{ width:100%; border:1.5px solid var(--zinco-claro); border-radius: var(--raio-sm); padding:12px 13px; background: var(--branco); color: var(--tinta); }
+  .grupo-campo input:focus, .grupo-campo textarea:focus{ border-color: var(--verde); outline:none; }
+  .grupo-campo textarea{ resize:vertical; min-height:74px; }
+
+  .capa-perfil{ background: linear-gradient(135deg, var(--verde) 0%, var(--verde-escuro) 100%); border-radius: var(--raio-lg); padding:22px 20px; color: var(--lona); margin-bottom:18px; position:relative; overflow:hidden; }
+  .capa-perfil::after{ content:""; position:absolute; inset:0; background-image: repeating-linear-gradient(120deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 22px); }
+  .capa-perfil .conteudo{ position:relative; display:flex; gap:14px; align-items:center; text-align:left; }
+  .capa-perfil .avatar{ width:64px; height:64px; font-size:22px; background: var(--trigo); color: var(--verde-escuro); border:3px solid rgba(255,252,245,0.4); }
+  .capa-perfil .nome{ font-family: var(--fonte-titulo); font-weight:800; font-size:19px; }
+  .capa-perfil .categoria-tag{ color: rgba(242,236,218,0.82); font-size:13px; margin-top:2px; }
+
+  .grade-acoes-contato{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
+
+  .medidor-pedido{ display:flex; gap:18px; align-items:stretch; padding: 6px 4px 14px; text-align:left; }
+  .silo{ width:18px; border-radius:9px; background: repeating-linear-gradient(0deg, var(--zinco-claro) 0px, var(--zinco-claro) 6px, #EDF0E9 6px, #EDF0E9 7px); border:1.5px solid var(--zinco-claro); position:relative; overflow:hidden; flex-shrink:0; }
+  .silo .enchimento{ position:absolute; left:0; right:0; bottom:0; background: linear-gradient(180deg, var(--trigo) 0%, var(--verde) 100%); height:0%; transition: height 0.7s cubic-bezier(.4,0,.2,1); border-radius:0 0 8px 8px; }
+  .etapas-pedido{ flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .etapa{ display:flex; align-items:center; gap:10px; }
+  .etapa .bolinha{ width:26px; height:26px; border-radius:50%; border:2px solid var(--zinco-claro); display:flex; align-items:center; justify-content:center; color:transparent; flex-shrink:0; transition: all 0.25s ease; }
+  .etapa .bolinha svg{ width:14px; height:14px; }
+  .etapa.feita .bolinha{ background: var(--verde); border-color: var(--verde); color: var(--branco); }
+  .etapa.atual .bolinha{ background: var(--trigo); border-color: var(--trigo-escuro); color: var(--verde-escuro); }
+  .etapa .texto .t{ font-weight:800; font-size:14px; }
+  .etapa .texto .d{ font-size:12px; color: var(--tinta-suave); }
+  .etapa:not(.feita):not(.atual) .texto .t{ color: var(--zinco); }
+
+  .pedido-resumo{ background: var(--lona-alt); border-radius: var(--raio-md); padding:14px; margin-bottom:18px; font-size:13.5px; text-align:left; }
+  .pedido-resumo .linha{ display:flex; justify-content:space-between; padding:5px 0; gap:12px; }
+  .pedido-resumo .linha .k{ color: var(--tinta-suave); flex-shrink:0; }
+  .pedido-resumo .linha .v{ font-weight:700; text-align:right; }
+
+  .grade-pedidos{ display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:16px; max-width:1200px; }
+  .cartao-pedido{ display:flex; align-items:center; gap:12px; background: var(--branco); border:1.5px solid var(--zinco-claro); border-radius: var(--raio-md); padding:15px; width:100%; text-align:left; transition: border-color 0.14s ease, transform 0.14s ease; }
+  .cartao-pedido:hover{ border-color: var(--verde); transform: translateY(-2px); }
+  .cartao-pedido .ic-cat{ width:42px; height:42px; border-radius:11px; background: var(--lona-alt); color: var(--verde); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .cartao-pedido .ic-cat svg{ width:22px; height:22px; }
+  .cartao-pedido .miolo{ flex:1; min-width:0; }
+  .cartao-pedido .titulo-pedido{ font-weight:800; font-size:14.5px; }
+  .cartao-pedido .sub-pedido{ font-size:12.5px; color: var(--tinta-suave); margin-top:2px; }
+  .badge-status{ font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px; white-space:nowrap; }
+  .badge-solicitado{ background:#F3E3C9; color:#8A6114; }
+  .badge-aceito{ background:#DCEBDD; color:#2B5E33; }
+  .badge-a_caminho{ background:#DCE7EE; color:#2A5877; }
+  .badge-concluido{ background:#E2E7DC; color:#4B5940; }
+
+  .container-perfil-conta{ max-width:560px; }
+  .cartao-conta{ display:flex; align-items:center; gap:14px; background: var(--branco); border:1.5px solid var(--zinco-claro); border-radius: var(--raio-md); padding:18px; margin-bottom:20px; }
+  .cartao-conta .avatar{ width:58px; height:58px; font-size:20px; }
+  .cartao-conta .nome{ font-weight:800; font-size:16px; }
+  .cartao-conta .local{ font-size:13px; color: var(--tinta-suave); margin-top:2px; }
+  .linha-menu{ display:flex; align-items:center; gap:12px; padding:14px 4px; border-bottom:1px dashed var(--zinco-claro); width:100%; text-align:left; }
+  .linha-menu:last-child{ border-bottom:none; }
+  .linha-menu .ic{ width:34px; height:34px; border-radius:10px; background: var(--lona-alt); color: var(--verde); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .linha-menu .ic svg{ width:18px; height:18px; }
+  .linha-menu .txt{ flex:1; font-weight:700; font-size:14.5px; }
+  .botao-perigo-fino{ background:transparent; color: var(--perigo); font-size:13px; font-weight:700; margin-top:8px; display:inline-flex; align-items:center; gap:6px; }
+
+  /* ================= NAV INFERIOR (mobile) ================= */
+  .nav-inferior-mobile{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:30; background: var(--branco); border-top:1px dashed var(--zinco-claro); padding: 8px 6px calc(env(safe-area-inset-bottom, 8px) + 8px); }
+  @media (min-width:900px){ .nav-inferior-mobile{ display:none; } }
+  .nav-inferior-mobile button{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 0; font-size:11px; font-weight:700; color: var(--zinco); border-radius:12px; }
+  .nav-inferior-mobile button svg{ width:21px; height:21px; }
+  .nav-inferior-mobile button.ativo{ color: var(--verde); background: rgba(52,94,59,0.09); }
+
+  /* ================= MODAL ================= */
+  #camada-modal{ position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center; padding:22px; background: rgba(20,26,16,0.5); }
+  #camada-modal.ativo{ display:flex; }
+  .modal{ position:relative; background: var(--branco); width:100%; max-width:480px; max-height:88vh; overflow-y:auto; border-radius: var(--raio-lg); box-shadow: var(--sombra); padding:24px 22px 28px; text-align:center; }
+  .modal .fechar-modal{ position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; background: var(--lona-alt); color:var(--tinta); display:flex; align-items:center; justify-content:center; z-index:2; }
+  .modal .fechar-modal svg{ width:17px; height:17px; }
+  @media (max-width:640px){
+    #camada-modal{ align-items:flex-end; padding:0; }
+    .modal{ max-width:100%; border-radius: 26px 26px 0 0; max-height:92vh; animation: subir 0.25s ease; }
+  }
+  @keyframes subir{ from{ transform: translateY(26px); opacity:0.4; } to{ transform: translateY(0); opacity:1; } }
+
+  /* ================= PAINEL ADMINISTRATIVO ================= */
+  #pagina-admin{ position:fixed; inset:0; z-index:55; display:none; background: var(--lona); overflow-y:auto; }
+  #pagina-admin.ativo{ display:block; }
+  .miolo-admin{ max-width:1180px; margin:0 auto; padding: 26px 28px 60px; }
+  .barra-voltar-admin{ display:flex; align-items:center; gap:10px; padding:16px 28px; background:var(--branco); border-bottom:1.5px solid var(--zinco-claro); position:sticky; top:0; z-index:2; }
+  .barra-voltar-admin button{ display:flex; align-items:center; gap:8px; font-weight:800; font-size:13.5px; color: var(--verde); padding:8px 14px; border-radius:999px; background: var(--lona-alt); }
+  .barra-voltar-admin button svg{ width:16px; height:16px; }
+  .painel-cabecalho{ display:flex; justify-content:space-between; align-items:flex-end; gap:20px; margin-bottom:26px; flex-wrap:wrap; border-bottom:1.5px dashed var(--zinco-claro); padding-bottom:22px; }
+  .painel-cabecalho h1{ font-family: var(--fonte-titulo); font-weight:900; font-size:26px; }
+  .painel-cabecalho p{ color: var(--tinta-suave); font-size:14px; margin-top:4px; }
+  .painel-cabecalho .marco{ font-family: var(--fonte-dados); font-size:12px; color: var(--zinco); text-transform:uppercase; letter-spacing:0.5px; }
+  .grade-estat{ display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom:28px; }
+  @media (max-width:760px){ .grade-estat{ grid-template-columns: repeat(2,1fr); } }
+  .cartao-estat{ background: var(--branco); border:1.5px solid var(--zinco-claro); border-radius: var(--raio-md); padding:18px; }
+  .cartao-estat .rot{ font-size:12px; font-weight:700; color: var(--tinta-suave); text-transform:uppercase; letter-spacing:0.4px; }
+  .cartao-estat .num{ font-family: var(--fonte-dados); font-weight:600; font-size:31px; color: var(--verde-escuro); margin-top:6px; }
+  .cartao-estat .delta{ font-size:12.5px; color: var(--sucesso); font-weight:700; margin-top:4px; }
+  .grade-painel{ display:grid; grid-template-columns: 1.1fr 1fr; gap:22px; margin-bottom:26px; }
+  @media (max-width:840px){ .grade-painel{ grid-template-columns: 1fr; } }
+  .bloco-painel{ background: var(--branco); border:1.5px solid var(--zinco-claro); border-radius: var(--raio-md); padding:20px; }
+  .bloco-painel h2{ font-family: var(--fonte-titulo); font-weight:800; font-size:15.5px; margin-bottom:16px; }
+  .barra-cat{ margin-bottom:12px; }
+  .barra-cat .topo{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px; }
+  .barra-cat .topo .n{ font-weight:800; color: var(--tinta-suave); }
+  .barra-cat .trilha{ height:9px; background: var(--lona-alt); border-radius:999px; overflow:hidden; }
+  .barra-cat .prog{ height:100%; background: linear-gradient(90deg, var(--verde), var(--trigo)); border-radius:999px; }
+  table.tabela-painel{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  table.tabela-painel th{ text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:0.4px; color: var(--zinco); padding:8px 6px; border-bottom:1.5px solid var(--zinco-claro); }
+  table.tabela-painel td{ padding:10px 6px; border-bottom:1px dashed var(--zinco-claro); }
+  table.tabela-painel tr:last-child td{ border-bottom:none; }
+  .lista-moderacao .item-mod{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px dashed var(--zinco-claro); flex-wrap:wrap; }
+  .lista-moderacao .item-mod:last-child{ border-bottom:none; }
+  .item-mod .miolo{ flex:1; }
+  .item-mod .nome{ font-weight:800; font-size:14px; }
+  .item-mod .meta{ font-size:12.5px; color: var(--tinta-suave); margin-top:2px; }
+  .item-mod .acoes{ display:flex; gap:8px; }
+  .btn-mini{ padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:800; }
+  .btn-mini.aprovar{ background: var(--verde); color: var(--branco); }
+  .btn-mini.recusar{ background: transparent; color: var(--perigo); border:1.5px solid var(--perigo); }
+  .tag-decidido{ font-size:12px; font-weight:800; padding:6px 12px; border-radius:999px; }
+  .tag-decidido.ok{ background:#DCEBDD; color:#2B5E33; }
+  .tag-decidido.no{ background:#F1DAD5; color:#8A2E1C; }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="pagina-login">
+  <div class="cartao-login">
+    <div class="selo-grande" id="icone-login"></div>
+    <h1>CampoFácil</h1>
+    <p class="tagline">Encontre prestadores de serviço rural perto de você: lavoura, pecuária, máquinas, construção e muito mais.</p>
+    <div class="grupo-campo">
+      <label for="input-nome">Seu nome (só para criar conta)</label>
+      <input id="input-nome" type="text" placeholder="Seu nome completo" autocomplete="name">
+    </div>
+    <div class="grupo-campo">
+      <label for="input-email">E-mail</label>
+      <input id="input-email" type="email" placeholder="seuemail@exemplo.com" autocomplete="email">
+    </div>
+    <div class="grupo-campo">
+      <label for="input-senha">Senha</label>
+      <input id="input-senha" type="password" placeholder="Sua senha" autocomplete="current-password">
+    </div>
+    <div id="mensagem-login" class="legenda-muted" style="min-height:18px; margin-bottom:12px;"></div>
+    <button class="botao botao-primario botao-bloco" onclick="entrarComEmail()">Entrar</button>
+    <button class="botao botao-secundario botao-bloco" style="margin-top:10px" onclick="criarContaComEmail()">Criar conta nova</button>
+  </div>
+</div>
+
+<!-- ================= APLICATIVO ================= -->
+<div id="aplicativo" class="oculto">
+  <aside class="barra-lateral">
+    <div class="lockup">
+      <div class="selo-icone" id="icone-marca-lateral"></div>
+      <div><div class="nome">CampoFácil</div><div class="sub">Versão web</div></div>
+    </div>
+    <nav class="nav-lateral" id="nav-lateral"></nav>
+    <div class="rodape-lateral">
+      <button onclick="abrirAdmin()" id="btn-admin-lateral"></button>
+    </div>
+  </aside>
+
+  <div class="coluna-principal">
+    <header class="barra-topo">
+      <div class="logo-mobile">
+        <div class="selo-icone" id="icone-marca-topo"></div>
+        <div class="nome">CampoFácil</div>
+      </div>
+      <div class="campo-busca-topo">
+        <span id="icone-busca-topo"></span>
+        <input type="text" placeholder="Buscar serviço ou prestador" oninput="buscar(this.value)">
+      </div>
+      <button class="sino-topo" id="sino-topo"></button>
+    </header>
+
+    <main class="area-conteudo">
+      <section class="painel-tela ativa" id="tela-inicio"></section>
+      <section class="painel-tela" id="tela-pedidos"></section>
+      <section class="painel-tela" id="tela-perfil"></section>
+    </main>
+  </div>
+
+  <nav class="nav-inferior-mobile" id="nav-inferior-mobile"></nav>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="camada-modal">
+  <div class="modal">
+    <button class="fechar-modal" onclick="fecharModal()" id="icone-fechar-modal"></button>
+    <div id="conteudo-modal"></div>
+  </div>
+</div>
+
+<!-- ================= PAINEL ADMINISTRATIVO ================= -->
+<div id="pagina-admin">
+  <div class="barra-voltar-admin">
+    <button onclick="voltarApp()" id="btn-voltar-admin"></button>
+  </div>
+  <div class="miolo-admin" id="miolo-admin"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ======================= CONEXÃO COM O BANCO (SUPABASE) ======================= */
+const SUPABASE_URL = 'https://dfihyuxxwhhtzioccabr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmaWh5dXh4d2hodHppb2NjYWJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MjQwMTgsImV4cCI6MjA5OTIwMDAxOH0.dJgwsSW944HrkO3QRAdlDIfis36YDy1CZcYGmQs4GU0';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Coloque aqui o(s) e-mail(s) que devem ver o Painel administrativo.
+// Isso só controla se o BOTÃO aparece — quem realmente pode aprovar/recusar
+// prestadores é controlado no banco de dados (tabela "administradores").
+const ADMIN_EMAILS = ['lbemm3@gmail.com'];
+
+/* ======================= ÍCONES ======================= */
+function ic(inner, size){ size = size || 24; return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+inner+'</svg>'; }
+const ICONES = {
+  logo: '<line x1="3" y1="19" x2="21" y2="19"/><line x1="3" y1="15" x2="21" y2="15"/><path d="M12 15c0-3 1-5 3-6"/><path d="M12 15c0-3 -1-5 -3-6"/><circle cx="12" cy="7" r="2"/>',
+  voltar: '<polyline points="15 18 9 12 15 6"/>',
+  busca: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  sino: '<path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  estrela: '<polygon points="12 2 15 9 22 9.5 16.5 14 18 21 12 17.5 6 21 7.5 14 2 9.5 9 9"/>',
+  telefone: '<path d="M6 3h4l2 5-2.3 1.4a11 11 0 0 0 5 5L16.6 12l5 2v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2z"/>',
+  whats: '<path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4 8.4 8.4 0 0 1-3.9-.9L3 21l1.9-5.8a8.4 8.4 0 0 1-.9-3.8A8.4 8.4 0 0 1 12.4 3a8.4 8.4 0 0 1 8.6 8.5z"/><path d="M8.5 8.7c.3 2.6 2.3 4.6 4.9 4.9"/>',
+  pino: '<path d="M12 22s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>',
+  check: '<polyline points="5 13 10 18 19 7"/>',
+  caminhao: '<rect x="2" y="10" width="11" height="7" rx="1"/><path d="M13 12h4l3 3v2h-7"/><circle cx="6" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/>',
+  trator: '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="2"/><path d="M6 18V9h6l4 4h2v5"/><path d="M9 9V6h2"/>',
+  retro: '<rect x="2" y="15" width="9" height="5" rx="1"/><circle cx="4.5" cy="20" r="1.4"/><circle cx="8.5" cy="20" r="1.4"/><path d="M9 15V9h3l6-4"/><path d="M18 5l3 2-4 5-3-2z"/>',
+  fardo: '<circle cx="12" cy="12" r="8"/><path d="M4 9h16M4 15h16"/>',
+  pedreiro: '<path d="M4 20l6-6"/><path d="M9 15l7-7 3 3-7 7z"/><rect x="8" y="3" width="5" height="4"/>',
+  raio: '<polygon points="13 2 4 14 11 14 10 22 20 9 13 9 13 2"/>',
+  caixa: '<rect x="2" y="8" width="20" height="12" rx="2"/><path d="M8 8V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/><line x1="2" y1="13" x2="22" y2="13"/>',
+  casa: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h5v-6h2v6h5V10"/>',
+  clip: '<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 3v2h6V3"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/>',
+  usuario: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  painel: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  seta: '<polyline points="9 18 15 12 9 6"/>',
+  sair: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  ajuda: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.7-2.5 2-2.5 4"/><line x1="12" y1="17" x2="12" y2="17"/>',
+  fechar: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  furrow: '<path d="M2 8c3-3 6 2 8 0s5-3 8 0"/><path d="M2 13c3-3 6 2 8 0s5-3 8 0"/><path d="M2 18c3-3 6 2 8 0s5-3 8 0"/>',
+  plantio: '<path d="M12 20V9"/><path d="M12 13c0-2 2-3 4-3"/><path d="M12 16c0-2-2-3-4-3"/><circle cx="12" cy="7" r="2"/>',
+  pulverizacao: '<circle cx="12" cy="7" r="2"/><path d="M6 5l3 2M18 5l-3 2M6 9l3-2M18 9l-3-2"/><path d="M12 10v3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/><circle cx="12" cy="20" r="1.3"/>',
+  colheita: '<path d="M12 4v15"/><path d="M12 7c-2-1.3-4-.3-5 1.3"/><path d="M12 7c2-1.3 4-.3 5 1.3"/><path d="M12 11c-2-1.3-4-.3-5 1.3"/><path d="M12 11c2-1.3 4-.3 5 1.3"/><path d="M9 21h6"/>',
+  tesoura: '<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><path d="M20 4L7.5 16.5"/><path d="M20 20L7.5 7.5"/>',
+  fardo_feno: '<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 10h16M4 14h16"/>',
+  vet: '<path d="M12 20s-7-4.2-9-8.5A4.8 4.8 0 0 1 12 8a4.8 4.8 0 0 1 9 3.5C19 15.8 12 20 12 20z"/><path d="M9.5 12h5M12 9.5v5"/>',
+  seringa: '<line x1="19" y1="5" x2="14" y2="10"/><path d="M14 10l-9 9-2-2 9-9z"/><line x1="11" y1="7" x2="13" y2="9"/><line x1="16.5" y1="7.5" x2="18.5" y2="9.5"/>',
+  balde_leite: '<path d="M9 3h6l1 4H8z"/><path d="M8 7h8l-1 13a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1z"/>',
+  cerca: '<line x1="4" y1="20" x2="4" y2="6"/><line x1="10" y1="20" x2="10" y2="6"/><line x1="16" y1="20" x2="16" y2="6"/><line x1="20" y1="20" x2="20" y2="6"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="2" y1="16" x2="22" y2="16"/>',
+  pa: '<path d="M12 3v11"/><path d="M8.5 6.5L12 3l3.5 3.5"/><path d="M7 14a5 5 0 0 0 10 0z"/>',
+  cacamba: '<rect x="2" y="9" width="10" height="7" rx="1"/><path d="M4 9l2-4h4l1 4"/><path d="M12 12h4l3 3v1h-7z"/><circle cx="6" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>',
+  chave_inglesa: '<path d="M14.7 6.3a4 4 0 1 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4z"/>',
+  solda: '<path d="M12 2c2.2 3.8 4 5.4 4 9a4 4 0 0 1-8 0c0-1.6.8-2.8 1.6-4"/>',
+  gota_poco: '<path d="M12 3c3 5 6 8 6 11a6 6 0 0 1-12 0c0-3 3-6 6-11z"/><line x1="4" y1="21" x2="20" y2="21"/>',
+  cano: '<rect x="3" y="9" width="6" height="6"/><path d="M9 12h6"/><rect x="15" y="9" width="6" height="6"/>',
+  solar: '<rect x="3" y="14" width="18" height="7" rx="1"/><line x1="3" y1="17.5" x2="21" y2="17.5"/><line x1="9" y1="14" x2="9" y2="21"/><line x1="15" y1="14" x2="15" y2="21"/><circle cx="12" cy="6" r="2.6"/><line x1="12" y1="1.5" x2="12" y2="2.8"/><line x1="8" y1="3.3" x2="8.8" y2="4.2"/><line x1="16" y1="3.3" x2="15.2" y2="4.2"/>',
+  serra: '<circle cx="12" cy="12" r="7"/><path d="M12 5v2.2M12 16.8V19M5 12h2.2M16.8 12H19M7.1 7.1l1.6 1.6M15.3 15.3l1.6 1.6M7.1 16.9l1.6-1.6M15.3 8.7l1.6-1.6"/>',
+  faca: '<path d="M3 21l8.5-8.5"/><path d="M11.5 12.5L19 5c1.1-1.1 2.1 0 1 1l-7.5 7.5z"/>',
+  lupa: '<circle cx="10" cy="10" r="6"/><line x1="14.5" y1="14.5" x2="21" y2="21"/>',
+  mapa: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  prancha: '<rect x="2" y="13" width="13" height="3" rx="1"/><path d="M15 13l4-4h2v7h-6z"/><circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/><circle cx="18" cy="19" r="1.6"/>',
+  rocadeira: '<line x1="4" y1="20" x2="13" y2="11"/><circle cx="16" cy="8" r="2.5"/><path d="M4 20h5"/>',
+  toco: '<ellipse cx="12" cy="18" rx="6" ry="3"/><path d="M8 18c0-4 1-8 4-12"/><path d="M16 18c0-4-1-8-4-12"/>',
+  espalhador: '<rect x="3" y="11" width="9" height="6" rx="1"/><path d="M12 13h3l4-3v6l-4-3"/><circle cx="6" cy="19" r="1.6"/><circle cx="10" cy="19" r="1.6"/><path d="M14 8c1 1 2 2 2 3M17 6c1 1 2.5 2.5 2.5 4M19.5 4.5c1 1 3 3 3 5"/>'
+};
+function iconeInline(nome, tamanho){ return ic(ICONES[nome] || '', tamanho); }
+
+/* ======================= DADOS ======================= */
+const GRUPOS = [
+  { id:'lavoura', rot:'Lavoura' },
+  { id:'pecuaria', rot:'Pecuária' },
+  { id:'maquinas', rot:'Máquinas e mecânica' },
+  { id:'construcao', rot:'Construção e manutenção' },
+  { id:'transporte', rot:'Transporte' },
+  { id:'tecnicos', rot:'Serviços técnicos' },
+  { id:'manejo_area', rot:'Manejo de área' },
+  { id:'outros', rot:'Outros' },
+];
+
+// A partir da Fase 1, CATEGORIAS não é mais uma lista fixa: ela é preenchida
+// com dados reais vindos do Supabase pela função carregarDados(), abaixo.
+let CATEGORIAS = [];
+
+const MAIS_USADAS = ['frete','trator','colheita','plantio','rocada','manutencao_maquinas','pedreiro','veterinario'];
+
+// Assim como CATEGORIAS, PRESTADORES agora vem do banco de dados real.
+let PRESTADORES = [];
+
+/* ======================= CARREGAR DADOS DO SUPABASE ======================= */
+async function carregarDados(){
+  const { data: cats, error: errCats } = await sb.from('categorias').select('*');
+  if(errCats){
+    console.error('Erro ao carregar categorias:', errCats);
+    return false;
+  }
+  CATEGORIAS = cats.map(c => ({ id:c.id, rot:c.rotulo, grupo:c.grupo, ic:c.icone }));
+
+  const { data: preds, error: errPreds } = await sb.from('prestadores').select('*').eq('status','aprovado');
+  if(errPreds){
+    console.error('Erro ao carregar prestadores:', errPreds);
+    return false;
+  }
+  // "dist" (distância até o agricultor) ainda não existe: depende de geolocalização,
+  // que entra numa fase futura. Por enquanto mostramos um traço no lugar do valor.
+  PRESTADORES = preds.map(p => ({
+    id:p.id, nome:p.nome, cat:p.categoria_id, cidade:p.cidade, raio:p.raio_km,
+    nota:Number(p.nota), avaliacoes:p.avaliacoes, verificado:true, dist:'—', telefone:p.telefone
+  }));
+  return true;
+}
+const ETAPAS_PEDIDO = [
+  { id:'solicitado', t:'Solicitado', d:'O pedido foi enviado ao prestador' },
+  { id:'aceito', t:'Aceito', d:'O prestador confirmou o serviço' },
+  { id:'a_caminho', t:'A caminho', d:'O prestador está indo até você' },
+  { id:'concluido', t:'Concluído', d:'Serviço realizado' },
+];
+let PEDIDOS = [];
+let proximoPedidoId = 1;
+let filtro = null; // { tipo:'categoria', id } ou { tipo:'busca', termo }
+let prestadorAtual = null;
+let pedidoAtualId = null;
+
+function iniciais(nome){ return nome.split(' ').filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase(); }
+function catInfo(id){ return CATEGORIAS.find(c=>c.id===id); }
+function formatarData(iso){ if(!iso) return ''; const [ano,mes,dia] = iso.split('-'); return dia+'/'+mes+'/'+ano; }
+
+/* ======================= LOGIN / SHELL ======================= */
+let usuarioAtual = null;
+let meuCadastroPrestador = null;
+
+async function carregarMeuCadastroPrestador(){
+  if(!usuarioAtual) return;
+  const { data, error } = await sb.from('prestadores').select('*').eq('user_id', usuarioAtual.id).maybeSingle();
+  if(error){ console.error('Erro ao carregar seu cadastro de prestador:', error); return; }
+  meuCadastroPrestador = data;
+}
+
+function atualizarVisibilidadeAdmin(){
+  const souAdmin = !!usuarioAtual && ADMIN_EMAILS.map(e=>e.toLowerCase()).includes((usuarioAtual.email||'').toLowerCase());
+  document.getElementById('btn-admin-lateral').style.display = souAdmin ? '' : 'none';
+}
+
+function mostrarMensagemLogin(msg, tipo){
+  const el = document.getElementById('mensagem-login');
+  el.textContent = msg || '';
+  el.style.color = tipo === 'erro' ? 'var(--perigo)' : 'var(--tinta-suave)';
+}
+
+function traduzErroAuth(msg){
+  if(/Invalid login credentials/i.test(msg)) return 'E-mail ou senha incorretos.';
+  if(/User already registered/i.test(msg)) return 'Já existe uma conta com esse e-mail. Tente entrar em vez de criar conta.';
+  if(/Email not confirmed/i.test(msg)) return 'Confirme seu e-mail antes de entrar (veja sua caixa de entrada).';
+  if(/Password should be at least/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
+  return msg;
+}
+
+async function entrarComEmail(){
+  const email = document.getElementById('input-email').value.trim();
+  const senha = document.getElementById('input-senha').value;
+  if(!email || !senha){ mostrarMensagemLogin('Preencha e-mail e senha.', 'erro'); return; }
+  mostrarMensagemLogin('Entrando...');
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+  if(error){ mostrarMensagemLogin(traduzErroAuth(error.message), 'erro'); return; }
+  await iniciarApp();
+}
+
+async function criarContaComEmail(){
+  const nome = document.getElementById('input-nome').value.trim();
+  const email = document.getElementById('input-email').value.trim();
+  const senha = document.getElementById('input-senha').value;
+  if(!nome){ mostrarMensagemLogin('Preencha seu nome para criar a conta.', 'erro'); return; }
+  if(!email || !senha){ mostrarMensagemLogin('Preencha e-mail e senha.', 'erro'); return; }
+  mostrarMensagemLogin('Criando conta...');
+  const { data, error } = await sb.auth.signUp({ email, password: senha, options:{ data:{ nome } } });
+  if(error){ mostrarMensagemLogin(traduzErroAuth(error.message), 'erro'); return; }
+  if(!data.session){
+    mostrarMensagemLogin('Conta criada! Verifique seu e-mail para confirmar antes de entrar.');
+    return;
+  }
+  await iniciarApp();
+}
+
+async function iniciarApp(){
+  const { data:{ user } } = await sb.auth.getUser();
+  usuarioAtual = user;
+  atualizarVisibilidadeAdmin();
+  await carregarMeuCadastroPrestador();
+  document.getElementById('pagina-login').classList.add('oculto');
+  document.getElementById('aplicativo').classList.remove('oculto');
+  document.getElementById('tela-inicio').innerHTML = '<div class="legenda-muted">Carregando dados...</div>';
+  const ok = await carregarDados();
+  if(!ok){
+    document.getElementById('tela-inicio').innerHTML =
+      '<div class="estado-vazio"><div class="ic">'+iconeInline('busca',28)+'</div>'
+      + '<p>Não foi possível carregar os dados agora. Verifique sua conexão com a internet e tente novamente. Se o problema continuar, avise o suporte técnico.</p>'
+      + '<button class="botao botao-primario" onclick="iniciarApp()">Tentar novamente</button></div>';
+    return;
+  }
+  renderInicio();
+}
+
+function nomeExibicao(){
+  if(!usuarioAtual) return '';
+  const meta = usuarioAtual.user_metadata || {};
+  if(meta.nome) return meta.nome.split(' ')[0];
+  return (usuarioAtual.email || '').split('@')[0];
+}
+
+// Se a pessoa já tinha feito login antes (sessão salva pelo navegador), entra direto.
+(async function verificarSessaoExistente(){
+  const { data } = await sb.auth.getSession();
+  if(data.session) await iniciarApp();
+})();
+
+const ABAS = [
+  { id:'tela-inicio', rot:'Início', ic:'casa' },
+  { id:'tela-pedidos', rot:'Pedidos', ic:'clip' },
+  { id:'tela-perfil', rot:'Perfil', ic:'usuario' },
+];
+
+function renderNavegacao(){
+  document.getElementById('nav-lateral').innerHTML = ABAS.map(a=>
+    '<button data-aba="'+a.id+'" onclick="trocarAba(\''+a.id+'\')">'+iconeInline(a.ic,19)+'<span>'+a.rot+'</span></button>'
+  ).join('');
+  document.getElementById('nav-inferior-mobile').innerHTML = ABAS.map(a=>
+    '<button data-aba="'+a.id+'" onclick="trocarAba(\''+a.id+'\')">'+iconeInline(a.ic,20)+'<span>'+a.rot+'</span></button>'
+  ).join('');
+  document.getElementById('btn-admin-lateral').innerHTML = iconeInline('painel',17)+'<span>Painel administrativo</span>';
+}
+
+async function trocarAba(id){
+  document.querySelectorAll('.painel-tela').forEach(t=>t.classList.remove('ativa'));
+  document.getElementById(id).classList.add('ativa');
+  document.querySelectorAll('.nav-lateral button, .nav-inferior-mobile button').forEach(b=>{
+    b.classList.toggle('ativo', b.dataset.aba === id);
+  });
+  document.getElementById('aplicativo').querySelector('.area-conteudo').scrollTop = 0;
+  if(id === 'tela-pedidos'){
+    document.getElementById('tela-pedidos').innerHTML = '<div class="legenda-muted">Carregando pedidos...</div>';
+    await carregarPedidos();
+    renderPedidos();
+  }
+  if(id === 'tela-perfil') renderPerfilConta();
+}
+
+/* ======================= INÍCIO / BUSCA ======================= */
+function renderInicio(){
+  const alvo = document.getElementById('tela-inicio');
+  alvo.innerHTML =
+    '<div class="saudacao">Oi, '+nomeExibicao()+'</div>'
+    + '<div class="legenda-muted">O que você precisa hoje?</div>'
+    + '<div id="bloco-categorias"></div>'
+    + '<div id="bloco-resultados"></div>';
+  renderBlocosInicio();
+}
+
+function blocoGrupoWeb(titulo, categorias){
+  return '<div class="rotulo-secao">'+titulo+'</div><div class="grade-categorias">'
+    + categorias.map(c=>'<button class="cat-botao" onclick="abrirCategoria(\''+c.id+'\')"><span class="ic">'+iconeInline(c.ic,22)+'</span><span class="rot">'+c.rot+'</span></button>').join('')
+    + '</div>';
+}
+
+function renderBlocosInicio(){
+  const blocoCat = document.getElementById('bloco-categorias');
+  const blocoRes = document.getElementById('bloco-resultados');
+
+  if(!filtro){
+    const maisUsadas = MAIS_USADAS.map(id=>CATEGORIAS.find(c=>c.id===id));
+    let html = blocoGrupoWeb('Mais usadas', maisUsadas);
+    GRUPOS.forEach(g=>{
+      const itens = CATEGORIAS.filter(c=>c.grupo===g.id);
+      if(itens.length) html += blocoGrupoWeb(g.rot, itens);
+    });
+    blocoCat.innerHTML = html;
+    const destaque = PRESTADORES.filter(p=>p.verificado).sort((a,b)=>b.nota-a.nota).slice(0,4);
+    blocoRes.innerHTML =
+      '<div class="rotulo-secao">Prestadores em destaque</div>'
+      + '<div class="grade-prestadores">' + destaque.map(cartaoPrestadorHTML).join('') + '</div>';
+    return;
+  }
+
+  blocoCat.innerHTML = '';
+  let lista, titulo;
+  if(filtro.tipo === 'categoria'){
+    lista = PRESTADORES.filter(p=>p.cat===filtro.id);
+    titulo = catInfo(filtro.id).rot;
+  } else {
+    const termo = filtro.termo;
+    lista = PRESTADORES.filter(p => p.nome.toLowerCase().includes(termo) || catInfo(p.cat).rot.toLowerCase().includes(termo) || p.cidade.toLowerCase().includes(termo));
+    titulo = 'Resultados para "'+filtro.termo+'"';
+  }
+
+  let corpo;
+  if(lista.length === 0){
+    corpo = '<div class="estado-vazio"><div class="ic">'+iconeInline('busca',28)+'</div>'
+      + '<p>Nenhum prestador encontrado para "'+titulo+'" nessa região. Tente outra categoria ou peça indicação à cooperativa local.</p></div>';
+  } else {
+    corpo = '<div class="grade-prestadores">' + lista.sort((a,b)=>b.nota-a.nota).map(cartaoPrestadorHTML).join('') + '</div>';
+  }
+
+  blocoRes.innerHTML =
+    '<div class="cabecalho-resultados"><h2>'+titulo+'</h2>'
+    + '<button class="chip-limpar" onclick="limparFiltro()">'+iconeInline('fechar',15)+' Limpar</button></div>'
+    + corpo;
+}
+
+function cartaoPrestadorHTML(p){
+  const c = catInfo(p.cat);
+  return '<button class="cartao-prestador" onclick="abrirPerfilPrestador('+p.id+')">'
+    + '<div class="avatar">'+iniciais(p.nome)+'</div>'
+    + '<div class="info-prestador">'
+      + '<div class="linha1"><span class="nome">'+p.nome+'</span>'+(p.verificado?'<span class="selo-verificado">'+iconeInline('check',10)+'Verif.</span>':'')+'</div>'
+      + '<div class="categoria-tag">'+c.rot+' · '+p.cidade+'</div>'
+      + '<div class="meta"><span class="item estrela">'+iconeInline('estrela',14)+' '+p.nota.toFixed(1)+' ('+p.avaliacoes+')</span><span class="item">'+iconeInline('pino',14)+' '+p.dist+'</span></div>'
+    + '</div></button>';
+}
+
+function abrirCategoria(id){
+  filtro = { tipo:'categoria', id:id };
+  trocarAba('tela-inicio');
+  renderBlocosInicio();
+}
+function buscar(texto){
+  texto = texto.trim().toLowerCase();
+  if(!texto){ if(filtro && filtro.tipo==='busca'){ filtro=null; trocarAba('tela-inicio'); renderBlocosInicio(); } return; }
+  filtro = { tipo:'busca', termo:texto };
+  trocarAba('tela-inicio');
+  renderBlocosInicio();
+}
+function limparFiltro(){ filtro = null; renderBlocosInicio(); }
+
+/* ======================= MODAL: PERFIL / SOLICITAR / ACOMPANHAR ======================= */
+function abrirModal(){ document.getElementById('camada-modal').classList.add('ativo'); }
+function fecharModal(){ document.getElementById('camada-modal').classList.remove('ativo'); }
+
+function abrirPerfilPrestador(id){
+  prestadorAtual = PRESTADORES.find(p=>p.id===id);
+  renderModalPerfil();
+  abrirModal();
+}
+function renderModalPerfil(){
+  const p = prestadorAtual, c = catInfo(p.cat);
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="capa-perfil"><div class="conteudo">'
+      + '<div class="avatar">'+iniciais(p.nome)+'</div>'
+      + '<div><div class="nome">'+p.nome+'</div><div class="categoria-tag">'+c.rot+' · '+p.cidade+'</div>'
+      + (p.verificado ? '<span class="selo-verificado" style="margin-top:8px">'+iconeInline('check',10)+'Verificado</span>' : '')
+      + '</div></div></div>'
+    + '<div class="cartao"><div class="meta" style="margin-top:0"><span class="item estrela">'+iconeInline('estrela',14)+' '+p.nota.toFixed(1)+' de nota ('+p.avaliacoes+' avaliações)</span></div>'
+      + '<div class="linha-tracejada"></div>'
+      + '<div class="meta"><span class="item">'+iconeInline('pino',14)+' Atende num raio de '+p.raio+' km a partir de '+p.cidade+'</span></div></div>'
+    + '<div class="rotulo-secao">Serviços oferecidos</div>'
+    + '<div class="cartao">'+c.rot+', a combinar conforme a necessidade da propriedade.</div>'
+    + '<div class="grade-acoes-contato"><button class="botao botao-secundario">'+iconeInline('telefone',18)+'Ligar</button><button class="botao botao-secundario">'+iconeInline('whats',18)+'WhatsApp</button></div>'
+    + '<button class="botao botao-trigo" onclick="abrirSolicitacao()">Solicitar serviço</button>';
+}
+
+function abrirSolicitacao(){
+  const p = prestadorAtual;
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Solicitar serviço</div>'
+    + '<div class="legenda-muted" style="margin-bottom:20px">Prestador: <strong style="color:var(--tinta)">'+p.nome+'</strong> · '+catInfo(p.cat).rot+'</div>'
+    + '<div class="grupo-campo"><label for="campo-local">Local do serviço</label><input id="campo-local" type="text" placeholder="Ex.: Linha São José, propriedade km 4" value="Minha propriedade"></div>'
+    + '<div class="grupo-campo"><label for="campo-data">Data desejada</label><input id="campo-data" type="date"></div>'
+    + '<div class="grupo-campo"><label for="campo-obs">Observações</label><textarea id="campo-obs" placeholder="Descreva o que precisa, tamanho da área, urgência etc."></textarea></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="enviarPedido()">Enviar pedido</button>';
+}
+
+function linkWhatsApp(telefone, mensagem){
+  let digitos = (telefone || '').replace(/\D/g, '');
+  if(!digitos) return null;
+  if(digitos.length <= 11) digitos = '55' + digitos;
+  return 'https://wa.me/' + digitos + '?text=' + encodeURIComponent(mensagem);
+}
+
+async function carregarPedidos(){
+  const { data, error } = await sb.from('pedidos').select('*').order('criado_em', { ascending:false });
+  if(error){ console.error('Erro ao carregar pedidos:', error); return; }
+  PEDIDOS = data.map(p => ({
+    id:p.id, prestadorId:p.prestador_id, cat:p.categoria_id, local:p.local,
+    data:p.data_desejada, obs:p.observacoes, status:p.status,
+    criadoEm:p.criado_em, agricultorUserId:p.agricultor_user_id
+  }));
+}
+
+async function enviarPedido(){
+  const local = document.getElementById('campo-local').value || 'Minha propriedade';
+  const data = document.getElementById('campo-data').value;
+  const obs = document.getElementById('campo-obs').value;
+
+  const { data: novo, error } = await sb.from('pedidos').insert({
+    prestador_id: prestadorAtual.id, categoria_id: prestadorAtual.cat,
+    local, data_desejada: data || null, observacoes: obs,
+    status: 'solicitado', agricultor_user_id: usuarioAtual.id
+  }).select().maybeSingle();
+
+  if(error){ alert('Não foi possível enviar o pedido: ' + error.message); return; }
+
+  const pedido = {
+    id:novo.id, prestadorId:novo.prestador_id, cat:novo.categoria_id, local:novo.local,
+    data:novo.data_desejada, obs:novo.observacoes, status:novo.status,
+    criadoEm:novo.criado_em, agricultorUserId:novo.agricultor_user_id
+  };
+  PEDIDOS.unshift(pedido);
+  pedidoAtualId = pedido.id;
+  renderModalAcompanhar();
+}
+
+function pedidoPorId(id){ return PEDIDOS.find(p=>p.id===id); }
+function proximaEtapa(status){ const idx = ETAPAS_PEDIDO.findIndex(e=>e.id===status); return idx < ETAPAS_PEDIDO.length-1 ? ETAPAS_PEDIDO[idx+1].id : status; }
+
+async function avancarStatus(){
+  const pedido = pedidoPorId(pedidoAtualId);
+  const novoStatus = proximaEtapa(pedido.status);
+  const { error } = await sb.from('pedidos').update({ status: novoStatus }).eq('id', pedido.id);
+  if(error){ alert('Não foi possível atualizar o status: ' + error.message); return; }
+  pedido.status = novoStatus;
+  renderModalAcompanhar();
+}
+
+function renderModalAcompanhar(){
+  const pedido = pedidoPorId(pedidoAtualId);
+  const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
+  const idxAtual = ETAPAS_PEDIDO.findIndex(e=>e.id===pedido.status);
+  const pct = Math.round(((idxAtual+1)/ETAPAS_PEDIDO.length)*100);
+  const concluido = pedido.status === 'concluido';
+  // Só quem é dono desse cadastro de prestador pode avançar a etapa de verdade —
+  // é o mesmo controle de permissão que existe no banco de dados (RLS).
+  const souOPrestador = !!meuCadastroPrestador && meuCadastroPrestador.id === pedido.prestadorId;
+  const etapasHTML = ETAPAS_PEDIDO.map((e,i)=>{
+    const feita = i < idxAtual, atual = i === idxAtual;
+    return '<div class="etapa '+(feita?'feita':'')+' '+(atual?'atual':'')+'"><div class="bolinha">'+((feita||atual)?iconeInline('check',13):'')+'</div><div class="texto"><div class="t">'+e.t+'</div><div class="d">'+e.d+'</div></div></div>';
+  }).join('');
+
+  const linkZap = linkWhatsApp(p.telefone, 'Olá, ' + p.nome + '! Fiz um pedido de ' + catInfo(pedido.cat).rot + ' pelo CampoFácil, em ' + pedido.local + '.');
+  const botaoZap = linkZap ? '<a class="botao botao-secundario botao-bloco" href="'+linkZap+'" target="_blank" rel="noopener" style="margin-bottom:10px;text-decoration:none">'+iconeInline('whats',18)+' Avisar '+p.nome+' pelo WhatsApp</a>' : '';
+
+  let botaoAcao;
+  if(concluido){
+    botaoAcao = '<button class="botao botao-secundario botao-bloco" disabled style="opacity:0.7">Pedido concluído ✓</button>';
+  } else if(souOPrestador){
+    botaoAcao = '<button class="botao botao-trigo" onclick="avancarStatus()">Avançar etapa</button>';
+  } else {
+    botaoAcao = '<div class="legenda-muted" style="text-align:center;margin-top:6px">Aguardando o prestador atualizar o status.</div>';
+  }
+
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Acompanhar pedido</div>'
+    + '<div class="cartao" style="display:flex;gap:12px;align-items:center;text-align:left"><div class="avatar">'+iniciais(p.nome)+'</div><div><div style="font-weight:800">'+p.nome+'</div><div class="categoria-tag">'+catInfo(pedido.cat).rot+'</div></div></div>'
+    + '<div class="cartao"><div class="medidor-pedido"><div class="silo"><div class="enchimento" id="enchimento-silo"></div></div><div class="etapas-pedido">'+etapasHTML+'</div></div></div>'
+    + '<div class="pedido-resumo"><div class="linha"><span class="k">Local</span><span class="v">'+pedido.local+'</span></div>'
+      + (pedido.data ? '<div class="linha"><span class="k">Data</span><span class="v">'+formatarData(pedido.data)+'</span></div>' : '')
+      + (pedido.obs ? '<div class="linha"><span class="k">Observações</span><span class="v">'+pedido.obs+'</span></div>' : '') + '</div>'
+    + botaoZap
+    + botaoAcao;
+
+  requestAnimationFrame(()=>{ document.getElementById('enchimento-silo').style.height = pct+'%'; });
+}
+
+function abrirPedidoExistente(id){ pedidoAtualId = id; renderModalAcompanhar(); abrirModal(); }
+
+/* ======================= CADASTRO DE PRESTADOR ======================= */
+function abrirCadastroPrestador(){
+  const opcoesCategorias = CATEGORIAS.map(c=>'<option value="'+c.id+'">'+c.rot+'</option>').join('');
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Cadastrar-me como prestador</div>'
+    + '<div class="legenda-muted" style="margin-bottom:20px">Seu cadastro passa por aprovação antes de aparecer para os agricultores.</div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-nome">Seu nome ou nome da empresa</label><input id="campo-prestador-nome" type="text" value="'+nomeExibicao()+'"></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-categoria">Categoria de serviço</label>'
+      + '<select id="campo-prestador-categoria" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro);font-size:15px">'+opcoesCategorias+'</select></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-cidade">Cidade</label><input id="campo-prestador-cidade" type="text" placeholder="Ex.: Ijuí"></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-raio">Raio de atendimento (km)</label><input id="campo-prestador-raio" type="number" value="30" min="5" max="200"></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-telefone">Telefone de contato</label><input id="campo-prestador-telefone" type="text" placeholder="(55) 9 9999-9999"></div>'
+    + '<div id="mensagem-cadastro-prestador" class="legenda-muted" style="min-height:18px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="enviarCadastroPrestador()">Enviar cadastro</button>';
+  abrirModal();
+}
+
+async function enviarCadastroPrestador(){
+  const nome = document.getElementById('campo-prestador-nome').value.trim();
+  const categoria_id = document.getElementById('campo-prestador-categoria').value;
+  const cidade = document.getElementById('campo-prestador-cidade').value.trim();
+  const raio_km = Number(document.getElementById('campo-prestador-raio').value) || 30;
+  const telefone = document.getElementById('campo-prestador-telefone').value.trim();
+  const msg = document.getElementById('mensagem-cadastro-prestador');
+
+  if(!nome || !cidade){
+    msg.textContent = 'Preencha ao menos o nome e a cidade.';
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  msg.textContent = 'Enviando...';
+  msg.style.color = 'var(--tinta-suave)';
+
+  const { data, error } = await sb.from('prestadores').insert({
+    nome, categoria_id, cidade, raio_km, telefone,
+    user_id: usuarioAtual.id, status: 'pendente'
+  }).select().maybeSingle();
+
+  if(error){
+    msg.textContent = 'Não foi possível enviar: ' + error.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  meuCadastroPrestador = data;
+  fecharModal();
+  renderPerfilConta();
+}
+
+
+function renderPedidos(){
+  const alvo = document.getElementById('tela-pedidos');
+  if(PEDIDOS.length === 0){
+    alvo.innerHTML = '<div class="rotulo-secao">Seus pedidos</div><div class="estado-vazio"><div class="ic">'+iconeInline('clip',28)+'</div>'
+      + '<p>Você ainda não solicitou nenhum serviço. Vá até o início e escolha uma categoria para começar.</p>'
+      + '<button class="botao botao-primario" onclick="trocarAba(\'tela-inicio\')">Ir para o início</button></div>';
+    return;
+  }
+  alvo.innerHTML = '<div class="rotulo-secao">Seus pedidos</div><div class="grade-pedidos">' + PEDIDOS.map(pedido=>{
+    const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
+    const etapa = ETAPAS_PEDIDO.find(e=>e.id===pedido.status);
+    return '<button class="cartao-pedido" onclick="abrirPedidoExistente('+pedido.id+')">'
+      + '<div class="ic-cat">'+iconeInline(catInfo(pedido.cat).ic,20)+'</div>'
+      + '<div class="miolo"><div class="titulo-pedido">'+p.nome+'</div><div class="sub-pedido">'+catInfo(pedido.cat).rot+' · '+pedido.local+'</div></div>'
+      + '<span class="badge-status badge-'+pedido.status+'">'+etapa.t+'</span></button>';
+  }).join('') + '</div>';
+}
+
+/* ======================= PERFIL / CONTA ======================= */
+function blocoStatusPrestador(){
+  if(!meuCadastroPrestador){
+    return '<button class="botao botao-secundario botao-bloco" style="margin-bottom:16px" onclick="abrirCadastroPrestador()">Quero me cadastrar como prestador</button>';
+  }
+  const statusTexto = { pendente:'Aguardando aprovação', aprovado:'Aprovado ✓', recusado:'Cadastro recusado' }[meuCadastroPrestador.status] || meuCadastroPrestador.status;
+  const c = catInfo(meuCadastroPrestador.categoria_id);
+  return '<div class="cartao" style="margin-bottom:16px">'
+    + '<div style="font-weight:800">Meu cadastro de prestador</div>'
+    + '<div class="categoria-tag">'+(c?c.rot:meuCadastroPrestador.categoria_id)+' · '+meuCadastroPrestador.cidade+'</div>'
+    + '<div style="margin-top:6px;font-weight:700">'+statusTexto+'</div></div>';
+}
+
+function renderPerfilConta(){
+  const nome = usuarioAtual && usuarioAtual.user_metadata && usuarioAtual.user_metadata.nome
+    ? usuarioAtual.user_metadata.nome
+    : nomeExibicao();
+  const email = usuarioAtual ? usuarioAtual.email : '';
+  document.getElementById('tela-perfil').innerHTML =
+    '<div class="rotulo-secao">Perfil</div>'
+    + '<div class="container-perfil-conta">'
+    + '<div class="cartao-conta"><div class="avatar">'+iniciais(nome)+'</div><div><div class="nome">'+nome+'</div><div class="local">'+email+'</div></div></div>'
+    + blocoStatusPrestador()
+    + '<div class="cartao" style="padding:4px 16px">'
+      + linhaMenu('telefone','Meu telefone e contato')
+      + linhaMenu('pino','Minha propriedade e localização')
+      + linhaMenu('ajuda','Central de ajuda')
+    + '</div>'
+    + '<button class="botao-perigo-fino" onclick="sair()">'+iconeInline('sair',16)+' Sair da conta</button>'
+    + '</div>';
+}
+function linhaMenu(iconeNome, texto){
+  return '<button class="linha-menu"><span class="ic">'+iconeInline(iconeNome,18)+'</span><span class="txt">'+texto+'</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--zinco)">'+ICONES.seta+'</svg></button>';
+}
+async function sair(){
+  await sb.auth.signOut();
+  usuarioAtual = null;
+  meuCadastroPrestador = null;
+  PEDIDOS = []; proximoPedidoId = 1; filtro = null;
+  document.getElementById('aplicativo').classList.add('oculto');
+  document.getElementById('pagina-login').classList.remove('oculto');
+  mostrarMensagemLogin('');
+}
+
+/* ======================= PAINEL ADMINISTRATIVO ======================= */
+const CONTAGEM_CATEGORIAS = [
+  { id:'frete', n:22 }, { id:'trator', n:18 }, { id:'colheita', n:14 }, { id:'plantio', n:11 },
+  { id:'rocada', n:10 }, { id:'retro', n:9 }, { id:'manutencao_maquinas', n:8 }, { id:'pedreiro', n:7 },
+  { id:'corte_silagem', n:6 }, { id:'veterinario', n:5 }, { id:'pulverizacao', n:5 }, { id:'eletricista', n:4 },
+  { id:'encanador', n:3 }, { id:'energia_solar', n:3 }, { id:'outros', n:2 },
+];
+const MUNICIPIOS = [
+  { nome:'Ijuí', prestadores:19, pedidos:16 }, { nome:'Santa Rosa', prestadores:15, pedidos:12 },
+  { nome:'Panambi', prestadores:12, pedidos:9 }, { nome:'Três de Maio', prestadores:10, pedidos:8 },
+  { nome:'Cruz Alta', prestadores:9, pedidos:7 }, { nome:'Palmeira das Missões', prestadores:8, pedidos:6 },
+];
+// MODERACAO agora é carregada de verdade do banco (ver carregarModeracao),
+// só quem estiver na tabela "administradores" consegue ver algo aqui.
+let MODERACAO = [];
+
+async function carregarModeracao(){
+  const { data, error } = await sb.from('prestadores').select('*').eq('status','pendente').order('criado_em', { ascending:true });
+  if(error){
+    console.error('Erro ao carregar moderação:', error);
+    MODERACAO = [];
+    return;
+  }
+  MODERACAO = data.map(m => ({ id:m.id, nome:m.nome, cat:m.categoria_id, cidade:m.cidade, status:m.status }));
+}
+
+async function contarPrestadoresAprovados(){
+  const { count, error } = await sb.from('prestadores').select('*', { count:'exact', head:true }).eq('status','aprovado');
+  if(error){ console.error(error); return '—'; }
+  return count;
+}
+
+async function abrirAdmin(){ document.getElementById('pagina-admin').classList.add('ativo'); await renderPainelAdmin(); }
+function voltarApp(){ document.getElementById('pagina-admin').classList.remove('ativo'); }
+
+async function renderPainelAdmin(){
+  document.getElementById('miolo-admin').innerHTML = '<div class="legenda-muted" style="padding:24px">Carregando painel...</div>';
+  const [totalAprovados] = await Promise.all([contarPrestadoresAprovados(), carregarModeracao()]);
+  const maxCont = Math.max(...CONTAGEM_CATEGORIAS.map(c=>c.n));
+  document.getElementById('miolo-admin').innerHTML =
+    '<div class="painel-cabecalho"><div><h1>Painel administrativo</h1><p>Visão para a UEM, cooperativas e prefeituras parceiras do CONECTA rural</p></div>'
+      + '<div class="marco">Prestadores e moderação: dados reais · o restante ainda é demonstração</div></div>'
+    + '<div class="grade-estat">'
+      + cartaoEstat('Prestadores cadastrados', String(totalAprovados), 'dado real')
+      + cartaoEstat('Agricultores ativos', '214', 'demonstração')
+      + cartaoEstat('Pedidos este mês', '58', 'demonstração')
+      + cartaoEstat('Taxa de aceitação', '82%', 'demonstração')
+    + '</div>'
+    + '<div class="grade-painel">'
+      + '<div class="bloco-painel"><h2>Serviços mais buscados</h2>' + CONTAGEM_CATEGORIAS.map(c=>{
+          const pct = Math.round((c.n/maxCont)*100);
+          return '<div class="barra-cat"><div class="topo"><span>'+catInfo(c.id).rot+'</span><span class="n">'+c.n+'</span></div><div class="trilha"><div class="prog" style="width:'+pct+'%"></div></div></div>';
+        }).join('') + '</div>'
+      + '<div class="bloco-painel"><h2>Prestadores por município</h2><table class="tabela-painel"><thead><tr><th>Município</th><th>Prestadores</th><th>Pedidos/mês</th></tr></thead><tbody>'
+        + MUNICIPIOS.map(m=>'<tr><td>'+m.nome+'</td><td>'+m.prestadores+'</td><td>'+m.pedidos+'</td></tr>').join('') + '</tbody></table></div>'
+    + '</div>'
+    + '<div class="bloco-painel"><h2>Cadastros aguardando aprovação</h2><div class="lista-moderacao" id="lista-moderacao"></div></div>';
+  renderModeracao();
+}
+function cartaoEstat(rot, num, delta){ return '<div class="cartao-estat"><div class="rot">'+rot+'</div><div class="num">'+num+'</div><div class="delta">'+delta+'</div></div>'; }
+function renderModeracao(){
+  if(MODERACAO.length === 0){
+    document.getElementById('lista-moderacao').innerHTML = '<div class="legenda-muted" style="padding:12px 0">Nenhum cadastro aguardando aprovação no momento.</div>';
+    return;
+  }
+  document.getElementById('lista-moderacao').innerHTML = MODERACAO.map(m=>{
+    const acoes = '<div class="acoes"><button class="btn-mini aprovar" onclick="decidirModeracao('+m.id+',\'aprovado\')">Aprovar</button><button class="btn-mini recusar" onclick="decidirModeracao('+m.id+',\'recusado\')">Recusar</button></div>';
+    return '<div class="item-mod"><div class="miolo"><div class="nome">'+m.nome+'</div><div class="meta">'+catInfo(m.cat).rot+' · '+m.cidade+'</div></div>'+acoes+'</div>';
+  }).join('');
+}
+async function decidirModeracao(id, status){
+  const { error } = await sb.from('prestadores').update({ status }).eq('id', id);
+  if(error){
+    alert('Não foi possível salvar a decisão: ' + error.message);
+    return;
+  }
+  await renderPainelAdmin();
+}
+
+/* ======================= INICIALIZAÇÃO ======================= */
+document.getElementById('icone-login').innerHTML = iconeInline('logo', 34);
+document.getElementById('icone-marca-lateral').innerHTML = iconeInline('logo', 18);
+document.getElementById('icone-marca-topo').innerHTML = iconeInline('logo', 16);
+document.getElementById('icone-busca-topo').innerHTML = iconeInline('busca', 17);
+document.getElementById('sino-topo').innerHTML = iconeInline('sino', 18);
+document.getElementById('icone-fechar-modal').innerHTML = iconeInline('fechar', 16);
+document.getElementById('btn-voltar-admin').innerHTML = iconeInline('voltar', 15) + '<span>Voltar ao app</span>';
+document.getElementById('camada-modal').addEventListener('click', function(e){ if(e.target === this) fecharModal(); });
+renderNavegacao();
+trocarAba('tela-inicio');
+</script>
+</body>
+</html>
