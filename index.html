@@ -515,6 +515,65 @@ let PEDIDOS = [];
 let proximoPedidoId = 1;
 let filtro = null; // { tipo:'categoria', id } ou { tipo:'busca', termo }
 let prestadorAtual = null;
+let agricultorCoords = null;
+
+/* ======================= DISTÂNCIA REAL (GEOLOCALIZAÇÃO) ======================= */
+// Coordenadas aproximadas das cidades da região noroeste do RS que já aparecem
+// no app. Servem para calcular a distância mesmo sem o prestador ter GPS.
+const CIDADES_COORDS = {
+  'ijuí': { lat:-28.3875, lon:-53.9147 },
+  'panambi': { lat:-28.2925, lon:-53.5017 },
+  'santa rosa': { lat:-27.8719, lon:-54.4806 },
+  'três de maio': { lat:-27.7847, lon:-54.2408 },
+  'cruz alta': { lat:-28.6389, lon:-53.6064 },
+  'palmeira das missões': { lat:-27.9006, lon:-53.3128 },
+  'campina das missões': { lat:-27.7211, lon:-54.8372 },
+  'ajuricaba': { lat:-28.2394, lon:-53.7669 },
+  'coronel barros': { lat:-28.35, lon:-54.05 },
+  'catuípe': { lat:-28.2417, lon:-54.0656 },
+};
+
+function normalizarCidade(c){ return (c || '').trim().toLowerCase(); }
+
+function haversineKm(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function obterLocalizacaoAgricultor(){
+  return new Promise(resolve => {
+    if(!navigator.geolocation){ resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 8000 }
+    );
+  });
+}
+
+function atualizarDistancias(){
+  if(!agricultorCoords) return;
+  PRESTADORES.forEach(p => {
+    const coordCidade = CIDADES_COORDS[normalizarCidade(p.cidade)];
+    if(coordCidade){
+      const km = haversineKm(agricultorCoords.lat, agricultorCoords.lon, coordCidade.lat, coordCidade.lon);
+      p.dist = Math.round(km) + ' km';
+    }
+  });
+}
+
+// Pede a localização em segundo plano (sem travar o app esperando a resposta)
+// e, se a pessoa autorizar, recalcula e reexibe as distâncias reais.
+async function atualizarLocalizacaoEDistancias(){
+  agricultorCoords = await obterLocalizacaoAgricultor();
+  if(!agricultorCoords) return;
+  atualizarDistancias();
+  const telaInicio = document.getElementById('tela-inicio');
+  if(telaInicio && telaInicio.classList.contains('ativa')) renderBlocosInicio();
+}
 let pedidoAtualId = null;
 
 function iniciais(nome){ return nome.split(' ').filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase(); }
@@ -594,6 +653,7 @@ async function iniciarApp(){
     return;
   }
   renderInicio();
+  atualizarLocalizacaoEDistancias(); // não bloqueia a tela — atualiza sozinho quando/se autorizado
 }
 
 function nomeExibicao(){
@@ -752,15 +812,47 @@ function renderModalPerfil(){
     + '<button class="botao botao-trigo" onclick="abrirSolicitacao()">Solicitar serviço</button>';
 }
 
+let localizacaoCapturada = null;
+
+function linkMapa(lat, lon){ return 'https://www.google.com/maps?q=' + lat + ',' + lon; }
+
 function abrirSolicitacao(){
   const p = prestadorAtual;
+  localizacaoCapturada = null;
   document.getElementById('conteudo-modal').innerHTML =
     '<div class="rotulo-secao" style="margin-top:0">Solicitar serviço</div>'
     + '<div class="legenda-muted" style="margin-bottom:20px">Prestador: <strong style="color:var(--tinta)">'+p.nome+'</strong> · '+catInfo(p.cat).rot+'</div>'
     + '<div class="grupo-campo"><label for="campo-local">Local do serviço</label><input id="campo-local" type="text" placeholder="Ex.: Linha São José, propriedade km 4" value="Minha propriedade"></div>'
+    + '<div class="grupo-campo"><label>Localização exata (opcional, recomendado para propriedades rurais)</label>'
+      + '<button type="button" class="botao botao-secundario botao-bloco" onclick="capturarLocalizacaoPedido()">'+iconeInline('pino',18)+' Usar minha localização atual (GPS)</button>'
+      + '<div id="status-local-gps" class="legenda-muted" style="margin-top:6px">Use este botão estando na propriedade, ou peça pra alguém que esteja lá abrir o app.</div>'
+    + '</div>'
     + '<div class="grupo-campo"><label for="campo-data">Data desejada</label><input id="campo-data" type="date"></div>'
     + '<div class="grupo-campo"><label for="campo-obs">Observações</label><textarea id="campo-obs" placeholder="Descreva o que precisa, tamanho da área, urgência etc."></textarea></div>'
     + '<button class="botao botao-primario botao-bloco" onclick="enviarPedido()">Enviar pedido</button>';
+}
+
+function capturarLocalizacaoPedido(){
+  const status = document.getElementById('status-local-gps');
+  if(!navigator.geolocation){
+    status.textContent = 'Seu navegador não suporta captura de localização.';
+    status.style.color = 'var(--perigo)';
+    return;
+  }
+  status.textContent = 'Obtendo localização...';
+  status.style.color = 'var(--tinta-suave)';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      localizacaoCapturada = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      status.innerHTML = iconeInline('check',13) + ' Localização capturada — <a href="'+linkMapa(localizacaoCapturada.lat, localizacaoCapturada.lon)+'" target="_blank" rel="noopener">ver no mapa</a>';
+      status.style.color = 'var(--tinta)';
+    },
+    () => {
+      status.textContent = 'Não foi possível obter a localização. Verifique a permissão de GPS do navegador.';
+      status.style.color = 'var(--perigo)';
+    },
+    { timeout: 10000, enableHighAccuracy: true }
+  );
 }
 
 function linkWhatsApp(telefone, mensagem){
@@ -776,7 +868,8 @@ async function carregarPedidos(){
   PEDIDOS = data.map(p => ({
     id:p.id, prestadorId:p.prestador_id, cat:p.categoria_id, local:p.local,
     data:p.data_desejada, obs:p.observacoes, status:p.status,
-    criadoEm:p.criado_em, agricultorUserId:p.agricultor_user_id
+    criadoEm:p.criado_em, agricultorUserId:p.agricultor_user_id,
+    latitude:p.latitude, longitude:p.longitude
   }));
 }
 
@@ -788,7 +881,9 @@ async function enviarPedido(){
   const { data: novo, error } = await sb.from('pedidos').insert({
     prestador_id: prestadorAtual.id, categoria_id: prestadorAtual.cat,
     local, data_desejada: data || null, observacoes: obs,
-    status: 'solicitado', agricultor_user_id: usuarioAtual.id
+    status: 'solicitado', agricultor_user_id: usuarioAtual.id,
+    latitude: localizacaoCapturada ? localizacaoCapturada.lat : null,
+    longitude: localizacaoCapturada ? localizacaoCapturada.lon : null
   }).select().maybeSingle();
 
   if(error){ alert('Não foi possível enviar o pedido: ' + error.message); return; }
@@ -796,7 +891,8 @@ async function enviarPedido(){
   const pedido = {
     id:novo.id, prestadorId:novo.prestador_id, cat:novo.categoria_id, local:novo.local,
     data:novo.data_desejada, obs:novo.observacoes, status:novo.status,
-    criadoEm:novo.criado_em, agricultorUserId:novo.agricultor_user_id
+    criadoEm:novo.criado_em, agricultorUserId:novo.agricultor_user_id,
+    latitude:novo.latitude, longitude:novo.longitude
   };
   PEDIDOS.unshift(pedido);
   pedidoAtualId = pedido.id;
@@ -829,7 +925,10 @@ function renderModalAcompanhar(){
     return '<div class="etapa '+(feita?'feita':'')+' '+(atual?'atual':'')+'"><div class="bolinha">'+((feita||atual)?iconeInline('check',13):'')+'</div><div class="texto"><div class="t">'+e.t+'</div><div class="d">'+e.d+'</div></div></div>';
   }).join('');
 
-  const linkZap = linkWhatsApp(p.telefone, 'Olá, ' + p.nome + '! Fiz um pedido de ' + catInfo(pedido.cat).rot + ' pelo CampoFácil, em ' + pedido.local + '.');
+  const temLocalizacaoExata = pedido.latitude != null && pedido.longitude != null;
+  const mensagemZap = 'Olá, ' + p.nome + '! Fiz um pedido de ' + catInfo(pedido.cat).rot + ' pelo CampoFácil, em ' + pedido.local + '.'
+    + (temLocalizacaoExata ? ' Localização exata: ' + linkMapa(pedido.latitude, pedido.longitude) : '');
+  const linkZap = linkWhatsApp(p.telefone, mensagemZap);
   const botaoZap = linkZap ? '<a class="botao botao-secundario botao-bloco" href="'+linkZap+'" target="_blank" rel="noopener" style="margin-bottom:10px;text-decoration:none">'+iconeInline('whats',18)+' Avisar '+p.nome+' pelo WhatsApp</a>' : '';
 
   let botaoAcao;
@@ -846,6 +945,7 @@ function renderModalAcompanhar(){
     + '<div class="cartao" style="display:flex;gap:12px;align-items:center;text-align:left"><div class="avatar">'+iniciais(p.nome)+'</div><div><div style="font-weight:800">'+p.nome+'</div><div class="categoria-tag">'+catInfo(pedido.cat).rot+'</div></div></div>'
     + '<div class="cartao"><div class="medidor-pedido"><div class="silo"><div class="enchimento" id="enchimento-silo"></div></div><div class="etapas-pedido">'+etapasHTML+'</div></div></div>'
     + '<div class="pedido-resumo"><div class="linha"><span class="k">Local</span><span class="v">'+pedido.local+'</span></div>'
+      + (temLocalizacaoExata ? '<div class="linha"><span class="k">Localização</span><span class="v"><a href="'+linkMapa(pedido.latitude, pedido.longitude)+'" target="_blank" rel="noopener">Ver no mapa</a></span></div>' : '')
       + (pedido.data ? '<div class="linha"><span class="k">Data</span><span class="v">'+formatarData(pedido.data)+'</span></div>' : '')
       + (pedido.obs ? '<div class="linha"><span class="k">Observações</span><span class="v">'+pedido.obs+'</span></div>' : '') + '</div>'
     + botaoZap
@@ -963,6 +1063,7 @@ async function sair(){
   await sb.auth.signOut();
   usuarioAtual = null;
   meuCadastroPrestador = null;
+  agricultorCoords = null;
   PEDIDOS = []; proximoPedidoId = 1; filtro = null;
   document.getElementById('aplicativo').classList.add('oculto');
   document.getElementById('pagina-login').classList.remove('oculto');
