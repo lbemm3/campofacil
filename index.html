@@ -515,6 +515,7 @@ const ETAPAS_PEDIDO = [
 ];
 let PEDIDOS = [];
 let proximoPedidoId = 1;
+let PEDIDOS_AVALIADOS = new Set();
 let filtro = null; // { tipo:'categoria', id } ou { tipo:'busca', termo }
 let prestadorAtual = null;
 let agricultorCoords = null;
@@ -874,6 +875,14 @@ async function carregarPedidos(){
     criadoEm:p.criado_em, agricultorUserId:p.agricultor_user_id,
     latitude:p.latitude, longitude:p.longitude, agricultorTelefone:p.agricultor_telefone
   }));
+  await carregarAvaliacoesFeitas();
+}
+
+async function carregarAvaliacoesFeitas(){
+  if(!usuarioAtual) return;
+  const { data, error } = await sb.from('avaliacoes').select('pedido_id').eq('agricultor_user_id', usuarioAtual.id);
+  if(error){ console.error('Erro ao carregar avaliações:', error); return; }
+  PEDIDOS_AVALIADOS = new Set(data.map(a => a.pedido_id));
 }
 
 async function enviarPedido(){
@@ -992,7 +1001,14 @@ function renderModalAcompanhar(){
 
     const concluido = pedido.status === 'concluido';
     if(concluido){
-      botaoAcao = '<button class="botao botao-secundario botao-bloco" disabled style="opacity:0.7">Pedido concluído ✓</button>';
+      if(souOAgricultor){
+        const jaAvaliado = PEDIDOS_AVALIADOS.has(pedido.id);
+        botaoAcao = jaAvaliado
+          ? '<div class="legenda-muted" style="text-align:center;margin-top:6px">'+iconeInline('check',13)+' Você avaliou este prestador. Obrigado!</div>'
+          : '<button class="botao botao-trigo botao-bloco" onclick="abrirAvaliacao('+pedido.id+')">Avaliar prestador</button>';
+      } else {
+        botaoAcao = '<button class="botao botao-secundario botao-bloco" disabled style="opacity:0.7">Pedido concluído ✓</button>';
+      }
     } else if(souOPrestador){
       if(pedido.status === 'solicitado'){
         botaoAcao = botaoCombinar
@@ -1031,6 +1047,70 @@ function renderModalAcompanhar(){
 }
 
 function abrirPedidoExistente(id){ pedidoAtualId = id; renderModalAcompanhar(); abrirModal(); }
+
+/* ======================= AVALIAÇÕES ======================= */
+let notaSelecionada = 0;
+
+function abrirAvaliacao(pedidoId){
+  const pedido = pedidoPorId(pedidoId);
+  const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
+  notaSelecionada = 0;
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Avaliar '+(p?p.nome:'prestador')+'</div>'
+    + '<div class="legenda-muted" style="margin-bottom:16px">'+catInfo(pedido.cat).rot+' · '+pedido.local+'</div>'
+    + '<div id="estrelas-avaliacao" style="display:flex;gap:8px;justify-content:center;margin-bottom:20px"></div>'
+    + '<div class="grupo-campo"><label for="campo-comentario-avaliacao">Comentário (opcional)</label><textarea id="campo-comentario-avaliacao" placeholder="Como foi o serviço?"></textarea></div>'
+    + '<div id="mensagem-avaliacao" class="legenda-muted" style="min-height:18px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="enviarAvaliacao('+pedido.id+','+pedido.prestadorId+')">Enviar avaliação</button>';
+  renderEstrelasAvaliacao();
+  abrirModal();
+}
+
+function renderEstrelasAvaliacao(){
+  const alvo = document.getElementById('estrelas-avaliacao');
+  if(!alvo) return;
+  alvo.innerHTML = [1,2,3,4,5].map(n=>{
+    const preenchida = n <= notaSelecionada;
+    return '<button type="button" onclick="selecionarNota('+n+')" aria-label="'+n+' estrela(s)" style="background:none;border:none;cursor:pointer;padding:2px;color:'+(preenchida?'var(--trigo)':'var(--zinco-claro)')+'">'+iconeInline('estrela',32)+'</button>';
+  }).join('');
+}
+
+function selecionarNota(n){ notaSelecionada = n; renderEstrelasAvaliacao(); }
+
+async function enviarAvaliacao(pedidoId, prestadorId){
+  const msg = document.getElementById('mensagem-avaliacao');
+  if(notaSelecionada === 0){
+    msg.textContent = 'Selecione de 1 a 5 estrelas.';
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+  const comentario = document.getElementById('campo-comentario-avaliacao').value.trim();
+  msg.textContent = 'Enviando...';
+  msg.style.color = 'var(--tinta-suave)';
+
+  const { error } = await sb.from('avaliacoes').insert({
+    pedido_id: pedidoId, prestador_id: prestadorId, agricultor_user_id: usuarioAtual.id,
+    nota: notaSelecionada, comentario: comentario || null
+  });
+
+  if(error){
+    msg.textContent = 'Não foi possível enviar: ' + error.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  PEDIDOS_AVALIADOS.add(pedidoId);
+  // Atualiza a nota exibida na hora, sem precisar recarregar tudo do banco
+  const p = PRESTADORES.find(pr=>pr.id===prestadorId);
+  if(p){
+    const totalAnterior = p.avaliacoes || 0;
+    const notaAnterior = p.nota || 0;
+    const novoTotal = totalAnterior + 1;
+    p.nota = Math.round(((notaAnterior*totalAnterior + notaSelecionada) / novoTotal) * 10) / 10;
+    p.avaliacoes = novoTotal;
+  }
+  fecharModal();
+}
 
 /* ======================= CADASTRO DE PRESTADOR ======================= */
 function abrirCadastroPrestador(){
@@ -1141,7 +1221,7 @@ async function sair(){
   usuarioAtual = null;
   meuCadastroPrestador = null;
   agricultorCoords = null;
-  PEDIDOS = []; proximoPedidoId = 1; filtro = null;
+  PEDIDOS = []; proximoPedidoId = 1; filtro = null; PEDIDOS_AVALIADOS = new Set();
   document.getElementById('aplicativo').classList.add('oculto');
   document.getElementById('pagina-login').classList.remove('oculto');
   mostrarMensagemLogin('');
