@@ -895,13 +895,6 @@ async function enviarPedido(){
   const data = document.getElementById('campo-data').value;
   const obs = document.getElementById('campo-obs').value;
 
-  // Abre a aba do WhatsApp já aqui (antes do "await"), senão o navegador
-  // costuma bloquear a abertura automática por vir depois de uma pausa assíncrona.
-  let janelaZapPrestador = null;
-  if(prestadorAtual.telefone){
-    janelaZapPrestador = window.open('', '_blank');
-  }
-
   const { data: novo, error } = await sb.from('pedidos').insert({
     prestador_id: prestadorAtual.id, categoria_id: prestadorAtual.cat,
     local, data_desejada: data || null, observacoes: obs,
@@ -911,19 +904,7 @@ async function enviarPedido(){
     agricultor_telefone: telAgricultor || null
   }).select().maybeSingle();
 
-  if(error){
-    if(janelaZapPrestador) janelaZapPrestador.close();
-    alert('Não foi possível enviar o pedido: ' + error.message);
-    return;
-  }
-
-  if(janelaZapPrestador){
-    const temLocalizacaoExata = novo.latitude != null && novo.longitude != null;
-    const msg = 'Novo pedido recebido pelo CampoFácil! ' + catInfo(novo.categoria_id).rot + ' em ' + novo.local + '.'
-      + (temLocalizacaoExata ? ' Localização: ' + linkMapa(novo.latitude, novo.longitude) : '')
-      + ' Abra o app pra aceitar, recusar ou combinar os detalhes.';
-    janelaZapPrestador.location.href = linkWhatsApp(prestadorAtual.telefone, msg);
-  }
+  if(error){ alert('Não foi possível enviar o pedido: ' + error.message); return; }
 
   const pedido = {
     id:novo.id, prestadorId:novo.prestador_id, cat:novo.categoria_id, local:novo.local,
@@ -959,24 +940,7 @@ async function avancarStatus(){
 async function decidirPedido(novoStatus){
   const pedido = pedidoPorId(pedidoAtualId);
   if(novoStatus === 'recusado' && !confirm('Tem certeza que deseja recusar este pedido?')) return;
-
-  // Abre a aba do WhatsApp já aqui (antes do "await"), senão o navegador
-  // costuma bloquear a abertura automática por vir depois de uma pausa assíncrona.
-  let janelaZap = null;
-  if(novoStatus === 'aceito' && pedido.agricultorTelefone){
-    janelaZap = window.open('', '_blank');
-  }
-
-  const sucesso = await atualizarStatusServidor(pedido, novoStatus);
-  if(!sucesso){ if(janelaZap) janelaZap.close(); return; }
-
-  if(janelaZap){
-    const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
-    const msg = 'Olá! Seu pedido de ' + catInfo(pedido.cat).rot + ' foi ACEITO por ' + (p ? p.nome : 'o prestador') + ' pelo CampoFácil. Vamos combinar os detalhes?';
-    janelaZap.location.href = linkWhatsApp(pedido.agricultorTelefone, msg);
-  }
-
-  renderModalAcompanhar();
+  if(await atualizarStatusServidor(pedido, novoStatus)) renderModalAcompanhar();
 }
 
 async function cancelarPedido(){
@@ -1002,7 +966,7 @@ function renderModalAcompanhar(){
   const mensagemZap = 'Olá, ' + p.nome + '! Fiz um pedido de ' + catInfo(pedido.cat).rot + ' pelo CampoFácil, em ' + pedido.local + '.'
     + (temLocalizacaoExata ? ' Localização exata: ' + linkMapa(pedido.latitude, pedido.longitude) : '');
   const linkZapAoPrestador = linkWhatsApp(p.telefone, mensagemZap);
-  const botaoZapPrestador = linkZapAoPrestador ? '<a class="botao botao-secundario botao-bloco" href="'+linkZapAoPrestador+'" target="_blank" rel="noopener" style="margin-bottom:10px;text-decoration:none">'+iconeInline('whats',18)+' Avisar '+p.nome+' pelo WhatsApp</a>' : '';
+  const botaoZapPrestador = linkZapAoPrestador ? '<a class="botao botao-trigo botao-bloco" href="'+linkZapAoPrestador+'" target="_blank" rel="noopener" style="margin-bottom:10px;text-decoration:none">'+iconeInline('whats',18)+' Avisar '+p.nome+' pelo WhatsApp</a>' : '';
 
   const linkCombinarZap = linkCombinar(pedido);
   const botaoCombinar = linkCombinarZap
