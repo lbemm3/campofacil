@@ -895,6 +895,13 @@ async function enviarPedido(){
   const data = document.getElementById('campo-data').value;
   const obs = document.getElementById('campo-obs').value;
 
+  // Abre a aba do WhatsApp já aqui (antes do "await"), senão o navegador
+  // costuma bloquear a abertura automática por vir depois de uma pausa assíncrona.
+  let janelaZapPrestador = null;
+  if(prestadorAtual.telefone){
+    janelaZapPrestador = window.open('', '_blank');
+  }
+
   const { data: novo, error } = await sb.from('pedidos').insert({
     prestador_id: prestadorAtual.id, categoria_id: prestadorAtual.cat,
     local, data_desejada: data || null, observacoes: obs,
@@ -904,7 +911,19 @@ async function enviarPedido(){
     agricultor_telefone: telAgricultor || null
   }).select().maybeSingle();
 
-  if(error){ alert('Não foi possível enviar o pedido: ' + error.message); return; }
+  if(error){
+    if(janelaZapPrestador) janelaZapPrestador.close();
+    alert('Não foi possível enviar o pedido: ' + error.message);
+    return;
+  }
+
+  if(janelaZapPrestador){
+    const temLocalizacaoExata = novo.latitude != null && novo.longitude != null;
+    const msg = 'Novo pedido recebido pelo CampoFácil! ' + catInfo(novo.categoria_id).rot + ' em ' + novo.local + '.'
+      + (temLocalizacaoExata ? ' Localização: ' + linkMapa(novo.latitude, novo.longitude) : '')
+      + ' Abra o app pra aceitar, recusar ou combinar os detalhes.';
+    janelaZapPrestador.location.href = linkWhatsApp(prestadorAtual.telefone, msg);
+  }
 
   const pedido = {
     id:novo.id, prestadorId:novo.prestador_id, cat:novo.categoria_id, local:novo.local,
