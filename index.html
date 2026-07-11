@@ -1162,6 +1162,58 @@ async function enviarCadastroPrestador(){
   renderPerfilConta();
 }
 
+function abrirEdicaoPrestador(){
+  const c = meuCadastroPrestador;
+  const opcoesCategorias = CATEGORIAS.map(cat=>'<option value="'+cat.id+'" '+(cat.id===c.categoria_id?'selected':'')+'>'+cat.rot+'</option>').join('');
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Meu cadastro de prestador</div>'
+    + '<div class="legenda-muted" style="margin-bottom:20px">Alterar categoria ou dados aqui não afeta suas avaliações já recebidas.</div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-nome">Seu nome ou nome da empresa</label><input id="campo-prestador-nome" type="text" value="'+c.nome+'"></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-categoria">Categoria de serviço</label>'
+      + '<select id="campo-prestador-categoria" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro);font-size:15px">'+opcoesCategorias+'</select></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-cidade">Cidade</label><input id="campo-prestador-cidade" type="text" value="'+c.cidade+'"></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-raio">Raio de atendimento (km)</label><input id="campo-prestador-raio" type="number" value="'+c.raio_km+'" min="5" max="200"></div>'
+    + '<div class="grupo-campo"><label for="campo-prestador-telefone">Telefone de contato</label><input id="campo-prestador-telefone" type="text" value="'+(c.telefone||'')+'" placeholder="(55) 9 9999-9999"></div>'
+    + '<div id="mensagem-cadastro-prestador" class="legenda-muted" style="min-height:18px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="salvarEdicaoPrestador()">Salvar alterações</button>'
+    + '<button class="botao botao-secundario botao-bloco" style="margin-top:10px;color:var(--perigo);border-color:var(--perigo)" onclick="excluirCadastroPrestador()">Desativar meu cadastro de prestador</button>';
+  abrirModal();
+}
+
+async function salvarEdicaoPrestador(){
+  const nome = document.getElementById('campo-prestador-nome').value.trim();
+  const categoria_id = document.getElementById('campo-prestador-categoria').value;
+  const cidade = document.getElementById('campo-prestador-cidade').value.trim();
+  const raio_km = Number(document.getElementById('campo-prestador-raio').value) || 30;
+  const telefone = document.getElementById('campo-prestador-telefone').value.trim();
+  const msg = document.getElementById('mensagem-cadastro-prestador');
+
+  if(!nome || !cidade){
+    msg.textContent = 'Preencha ao menos o nome e a cidade.';
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  msg.textContent = 'Salvando...';
+  msg.style.color = 'var(--tinta-suave)';
+
+  const { data, error } = await sb.from('prestadores')
+    .update({ nome, categoria_id, cidade, raio_km, telefone })
+    .eq('id', meuCadastroPrestador.id)
+    .select()
+    .maybeSingle();
+
+  if(error){
+    msg.textContent = 'Não foi possível salvar: ' + error.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  meuCadastroPrestador = data;
+  fecharModal();
+  renderPerfilConta();
+}
+
 
 function renderPedidos(){
   const alvo = document.getElementById('tela-pedidos');
@@ -1187,12 +1239,48 @@ function blocoStatusPrestador(){
   if(!meuCadastroPrestador){
     return '<button class="botao botao-secundario botao-bloco" style="margin-bottom:16px" onclick="abrirCadastroPrestador()">Quero me cadastrar como prestador</button>';
   }
+  if(meuCadastroPrestador.status === 'inativo'){
+    const c = catInfo(meuCadastroPrestador.categoria_id);
+    return '<div class="cartao" style="margin-bottom:16px">'
+      + '<div style="font-weight:800">Meu cadastro de prestador</div>'
+      + '<div class="categoria-tag">'+(c?c.rot:meuCadastroPrestador.categoria_id)+' · '+meuCadastroPrestador.cidade+'</div>'
+      + '<div style="margin-top:6px;font-weight:700;color:var(--zinco)">Desativado — você não aparece mais nas buscas</div>'
+      + '<button class="botao botao-secundario botao-bloco" style="margin-top:12px" onclick="reativarCadastroPrestador()">Reativar cadastro</button>'
+      + '</div>';
+  }
   const statusTexto = { pendente:'Aguardando aprovação', aprovado:'Aprovado ✓', recusado:'Cadastro recusado' }[meuCadastroPrestador.status] || meuCadastroPrestador.status;
   const c = catInfo(meuCadastroPrestador.categoria_id);
-  return '<div class="cartao" style="margin-bottom:16px">'
-    + '<div style="font-weight:800">Meu cadastro de prestador</div>'
-    + '<div class="categoria-tag">'+(c?c.rot:meuCadastroPrestador.categoria_id)+' · '+meuCadastroPrestador.cidade+'</div>'
-    + '<div style="margin-top:6px;font-weight:700">'+statusTexto+'</div></div>';
+  return '<button class="cartao" style="margin-bottom:16px;text-align:left;width:100%;cursor:pointer" onclick="abrirEdicaoPrestador()">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+      + '<div><div style="font-weight:800">Meu cadastro de prestador</div>'
+      + '<div class="categoria-tag">'+(c?c.rot:meuCadastroPrestador.categoria_id)+' · '+meuCadastroPrestador.cidade+'</div>'
+      + '<div style="margin-top:6px;font-weight:700">'+statusTexto+'</div></div>'
+      + '<span style="color:var(--zinco)">'+iconeInline('seta',18)+'</span>'
+    + '</div></button>';
+}
+
+async function reativarCadastroPrestador(){
+  const { data, error } = await sb.from('prestadores')
+    .update({ status: 'pendente' })
+    .eq('id', meuCadastroPrestador.id)
+    .select()
+    .maybeSingle();
+  if(error){ alert('Não foi possível reativar: ' + error.message); return; }
+  meuCadastroPrestador = data;
+  renderPerfilConta();
+}
+
+async function excluirCadastroPrestador(){
+  if(!confirm('Tem certeza que deseja desativar seu cadastro de prestador? Você deixa de aparecer nas buscas e de receber novos pedidos. Dá pra reativar depois, quando quiser.')) return;
+  const { data, error } = await sb.from('prestadores')
+    .update({ status: 'inativo' })
+    .eq('id', meuCadastroPrestador.id)
+    .select()
+    .maybeSingle();
+  if(error){ alert('Não foi possível desativar: ' + error.message); return; }
+  meuCadastroPrestador = data;
+  fecharModal();
+  renderPerfilConta();
 }
 
 function renderPerfilConta(){
