@@ -241,6 +241,8 @@
   .badge-aceito{ background:#DCEBDD; color:#2B5E33; }
   .badge-a_caminho{ background:#DCE7EE; color:#2A5877; }
   .badge-concluido{ background:#E2E7DC; color:#4B5940; }
+  .badge-recusado{ background:#F5DCDC; color:#8A2B2B; }
+  .badge-cancelado{ background:#E7E4DF; color:#6B6559; }
 
   .container-perfil-conta{ max-width:560px; }
   .cartao-conta{ display:flex; align-items:center; gap:14px; background: var(--branco); border:1.5px solid var(--zinco-claro); border-radius: var(--raio-md); padding:18px; margin-bottom:20px; }
@@ -823,6 +825,7 @@ function abrirSolicitacao(){
     '<div class="rotulo-secao" style="margin-top:0">Solicitar serviço</div>'
     + '<div class="legenda-muted" style="margin-bottom:20px">Prestador: <strong style="color:var(--tinta)">'+p.nome+'</strong> · '+catInfo(p.cat).rot+'</div>'
     + '<div class="grupo-campo"><label for="campo-local">Local do serviço</label><input id="campo-local" type="text" placeholder="Ex.: Linha São José, propriedade km 4" value="Minha propriedade"></div>'
+    + '<div class="grupo-campo"><label for="campo-tel-agricultor">Seu telefone (para o prestador combinar detalhes)</label><input id="campo-tel-agricultor" type="text" placeholder="(55) 9 9999-9999"></div>'
     + '<div class="grupo-campo"><label>Localização exata (opcional, recomendado para propriedades rurais)</label>'
       + '<button type="button" class="botao botao-secundario botao-bloco" onclick="capturarLocalizacaoPedido()">'+iconeInline('pino',18)+' Usar minha localização atual (GPS)</button>'
       + '<div id="status-local-gps" class="legenda-muted" style="margin-top:6px">Use este botão estando na propriedade, ou peça pra alguém que esteja lá abrir o app.</div>'
@@ -869,12 +872,13 @@ async function carregarPedidos(){
     id:p.id, prestadorId:p.prestador_id, cat:p.categoria_id, local:p.local,
     data:p.data_desejada, obs:p.observacoes, status:p.status,
     criadoEm:p.criado_em, agricultorUserId:p.agricultor_user_id,
-    latitude:p.latitude, longitude:p.longitude
+    latitude:p.latitude, longitude:p.longitude, agricultorTelefone:p.agricultor_telefone
   }));
 }
 
 async function enviarPedido(){
   const local = document.getElementById('campo-local').value || 'Minha propriedade';
+  const telAgricultor = document.getElementById('campo-tel-agricultor').value.trim();
   const data = document.getElementById('campo-data').value;
   const obs = document.getElementById('campo-obs').value;
 
@@ -883,7 +887,8 @@ async function enviarPedido(){
     local, data_desejada: data || null, observacoes: obs,
     status: 'solicitado', agricultor_user_id: usuarioAtual.id,
     latitude: localizacaoCapturada ? localizacaoCapturada.lat : null,
-    longitude: localizacaoCapturada ? localizacaoCapturada.lon : null
+    longitude: localizacaoCapturada ? localizacaoCapturada.lon : null,
+    agricultor_telefone: telAgricultor || null
   }).select().maybeSingle();
 
   if(error){ alert('Não foi possível enviar o pedido: ' + error.message); return; }
@@ -892,7 +897,7 @@ async function enviarPedido(){
     id:novo.id, prestadorId:novo.prestador_id, cat:novo.categoria_id, local:novo.local,
     data:novo.data_desejada, obs:novo.observacoes, status:novo.status,
     criadoEm:novo.criado_em, agricultorUserId:novo.agricultor_user_id,
-    latitude:novo.latitude, longitude:novo.longitude
+    latitude:novo.latitude, longitude:novo.longitude, agricultorTelefone:novo.agricultor_telefone
   };
   PEDIDOS.unshift(pedido);
   pedidoAtualId = pedido.id;
@@ -902,56 +907,127 @@ async function enviarPedido(){
 function pedidoPorId(id){ return PEDIDOS.find(p=>p.id===id); }
 function proximaEtapa(status){ const idx = ETAPAS_PEDIDO.findIndex(e=>e.id===status); return idx < ETAPAS_PEDIDO.length-1 ? ETAPAS_PEDIDO[idx+1].id : status; }
 
+const STATUS_TERMINAIS_NEGATIVOS = {
+  recusado: { rot:'Recusado', cor:'var(--perigo)', msg:'O prestador recusou este pedido.' },
+  cancelado: { rot:'Cancelado', cor:'#6B6559', msg:'Este pedido foi cancelado pelo agricultor.' },
+};
+
+async function atualizarStatusServidor(pedido, novoStatus){
+  const { error } = await sb.from('pedidos').update({ status: novoStatus }).eq('id', pedido.id);
+  if(error){ alert('Não foi possível atualizar o pedido: ' + error.message); return false; }
+  pedido.status = novoStatus;
+  return true;
+}
+
 async function avancarStatus(){
   const pedido = pedidoPorId(pedidoAtualId);
-  const novoStatus = proximaEtapa(pedido.status);
-  const { error } = await sb.from('pedidos').update({ status: novoStatus }).eq('id', pedido.id);
-  if(error){ alert('Não foi possível atualizar o status: ' + error.message); return; }
-  pedido.status = novoStatus;
+  if(await atualizarStatusServidor(pedido, proximaEtapa(pedido.status))) renderModalAcompanhar();
+}
+
+async function decidirPedido(novoStatus){
+  const pedido = pedidoPorId(pedidoAtualId);
+  if(novoStatus === 'recusado' && !confirm('Tem certeza que deseja recusar este pedido?')) return;
+
+  // Abre a aba do WhatsApp já aqui (antes do "await"), senão o navegador
+  // costuma bloquear a abertura automática por vir depois de uma pausa assíncrona.
+  let janelaZap = null;
+  if(novoStatus === 'aceito' && pedido.agricultorTelefone){
+    janelaZap = window.open('', '_blank');
+  }
+
+  const sucesso = await atualizarStatusServidor(pedido, novoStatus);
+  if(!sucesso){ if(janelaZap) janelaZap.close(); return; }
+
+  if(janelaZap){
+    const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
+    const msg = 'Olá! Seu pedido de ' + catInfo(pedido.cat).rot + ' foi ACEITO por ' + (p ? p.nome : 'o prestador') + ' pelo CampoFácil. Vamos combinar os detalhes?';
+    janelaZap.location.href = linkWhatsApp(pedido.agricultorTelefone, msg);
+  }
+
   renderModalAcompanhar();
+}
+
+async function cancelarPedido(){
+  const pedido = pedidoPorId(pedidoAtualId);
+  if(!confirm('Tem certeza que deseja cancelar este pedido?')) return;
+  if(await atualizarStatusServidor(pedido, 'cancelado')) renderModalAcompanhar();
+}
+
+function linkCombinar(pedido){
+  if(!pedido.agricultorTelefone) return null;
+  const msg = 'Olá! Recebi seu pedido de ' + catInfo(pedido.cat).rot + ' pelo CampoFácil. Vamos combinar o valor, uma data e outros detalhes?';
+  return linkWhatsApp(pedido.agricultorTelefone, msg);
 }
 
 function renderModalAcompanhar(){
   const pedido = pedidoPorId(pedidoAtualId);
   const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
-  const idxAtual = ETAPAS_PEDIDO.findIndex(e=>e.id===pedido.status);
-  const pct = Math.round(((idxAtual+1)/ETAPAS_PEDIDO.length)*100);
-  const concluido = pedido.status === 'concluido';
-  // Só quem é dono desse cadastro de prestador pode avançar a etapa de verdade —
-  // é o mesmo controle de permissão que existe no banco de dados (RLS).
   const souOPrestador = !!meuCadastroPrestador && meuCadastroPrestador.id === pedido.prestadorId;
-  const etapasHTML = ETAPAS_PEDIDO.map((e,i)=>{
-    const feita = i < idxAtual, atual = i === idxAtual;
-    return '<div class="etapa '+(feita?'feita':'')+' '+(atual?'atual':'')+'"><div class="bolinha">'+((feita||atual)?iconeInline('check',13):'')+'</div><div class="texto"><div class="t">'+e.t+'</div><div class="d">'+e.d+'</div></div></div>';
-  }).join('');
+  const souOAgricultor = !!usuarioAtual && usuarioAtual.id === pedido.agricultorUserId;
+  const statusNegativo = STATUS_TERMINAIS_NEGATIVOS[pedido.status];
 
   const temLocalizacaoExata = pedido.latitude != null && pedido.longitude != null;
   const mensagemZap = 'Olá, ' + p.nome + '! Fiz um pedido de ' + catInfo(pedido.cat).rot + ' pelo CampoFácil, em ' + pedido.local + '.'
     + (temLocalizacaoExata ? ' Localização exata: ' + linkMapa(pedido.latitude, pedido.longitude) : '');
-  const linkZap = linkWhatsApp(p.telefone, mensagemZap);
-  const botaoZap = linkZap ? '<a class="botao botao-secundario botao-bloco" href="'+linkZap+'" target="_blank" rel="noopener" style="margin-bottom:10px;text-decoration:none">'+iconeInline('whats',18)+' Avisar '+p.nome+' pelo WhatsApp</a>' : '';
+  const linkZapAoPrestador = linkWhatsApp(p.telefone, mensagemZap);
+  const botaoZapPrestador = linkZapAoPrestador ? '<a class="botao botao-secundario botao-bloco" href="'+linkZapAoPrestador+'" target="_blank" rel="noopener" style="margin-bottom:10px;text-decoration:none">'+iconeInline('whats',18)+' Avisar '+p.nome+' pelo WhatsApp</a>' : '';
 
-  let botaoAcao;
-  if(concluido){
-    botaoAcao = '<button class="botao botao-secundario botao-bloco" disabled style="opacity:0.7">Pedido concluído ✓</button>';
-  } else if(souOPrestador){
-    botaoAcao = '<button class="botao botao-trigo" onclick="avancarStatus()">Avançar etapa</button>';
+  const linkCombinarZap = linkCombinar(pedido);
+  const botaoCombinar = linkCombinarZap
+    ? '<a class="botao botao-secundario botao-bloco" href="'+linkCombinarZap+'" target="_blank" rel="noopener" style="margin-bottom:10px;text-decoration:none">'+iconeInline('whats',18)+' Combinar detalhes pelo WhatsApp</a>'
+    : '<div class="legenda-muted" style="margin-bottom:10px">O agricultor não informou telefone, então não é possível combinar pelo WhatsApp neste pedido.</div>';
+
+  let corpoEtapas, botaoAcao;
+
+  if(statusNegativo){
+    corpoEtapas = '<div class="cartao" style="text-align:center"><div style="font-weight:800;color:'+statusNegativo.cor+'">'+statusNegativo.rot+'</div><div class="legenda-muted" style="margin-top:4px">'+statusNegativo.msg+'</div></div>';
+    botaoAcao = '';
   } else {
-    botaoAcao = '<div class="legenda-muted" style="text-align:center;margin-top:6px">Aguardando o prestador atualizar o status.</div>';
+    const idxAtual = ETAPAS_PEDIDO.findIndex(e=>e.id===pedido.status);
+    const etapasHTML = ETAPAS_PEDIDO.map((e,i)=>{
+      const feita = i < idxAtual, atual = i === idxAtual;
+      return '<div class="etapa '+(feita?'feita':'')+' '+(atual?'atual':'')+'"><div class="bolinha">'+((feita||atual)?iconeInline('check',13):'')+'</div><div class="texto"><div class="t">'+e.t+'</div><div class="d">'+e.d+'</div></div></div>';
+    }).join('');
+    corpoEtapas = '<div class="cartao"><div class="medidor-pedido"><div class="silo"><div class="enchimento" id="enchimento-silo"></div></div><div class="etapas-pedido">'+etapasHTML+'</div></div></div>';
+
+    const concluido = pedido.status === 'concluido';
+    if(concluido){
+      botaoAcao = '<button class="botao botao-secundario botao-bloco" disabled style="opacity:0.7">Pedido concluído ✓</button>';
+    } else if(souOPrestador){
+      if(pedido.status === 'solicitado'){
+        botaoAcao = botaoCombinar
+          + '<div style="display:flex;gap:10px">'
+            + '<button class="botao botao-trigo" style="flex:1" onclick="decidirPedido(\'aceito\')">Aceitar</button>'
+            + '<button class="botao botao-secundario" style="flex:1;color:var(--perigo);border-color:var(--perigo)" onclick="decidirPedido(\'recusado\')">Recusar</button>'
+          + '</div>';
+      } else {
+        botaoAcao = botaoCombinar + '<button class="botao botao-trigo botao-bloco" onclick="avancarStatus()">Avançar etapa</button>';
+      }
+    } else if(souOAgricultor){
+      const podeCancelar = pedido.status === 'solicitado';
+      botaoAcao = botaoZapPrestador + (podeCancelar
+        ? '<button class="botao botao-secundario botao-bloco" style="color:var(--perigo);border-color:var(--perigo)" onclick="cancelarPedido()">Cancelar pedido</button>'
+        : '<div class="legenda-muted" style="text-align:center;margin-top:6px">O prestador já aceitou o pedido — para desmarcar, combine diretamente com ele.</div>');
+    } else {
+      botaoAcao = '<div class="legenda-muted" style="text-align:center;margin-top:6px">Aguardando o prestador atualizar o status.</div>';
+    }
   }
 
   document.getElementById('conteudo-modal').innerHTML =
     '<div class="rotulo-secao" style="margin-top:0">Acompanhar pedido</div>'
     + '<div class="cartao" style="display:flex;gap:12px;align-items:center;text-align:left"><div class="avatar">'+iniciais(p.nome)+'</div><div><div style="font-weight:800">'+p.nome+'</div><div class="categoria-tag">'+catInfo(pedido.cat).rot+'</div></div></div>'
-    + '<div class="cartao"><div class="medidor-pedido"><div class="silo"><div class="enchimento" id="enchimento-silo"></div></div><div class="etapas-pedido">'+etapasHTML+'</div></div></div>'
+    + corpoEtapas
     + '<div class="pedido-resumo"><div class="linha"><span class="k">Local</span><span class="v">'+pedido.local+'</span></div>'
       + (temLocalizacaoExata ? '<div class="linha"><span class="k">Localização</span><span class="v"><a href="'+linkMapa(pedido.latitude, pedido.longitude)+'" target="_blank" rel="noopener">Ver no mapa</a></span></div>' : '')
       + (pedido.data ? '<div class="linha"><span class="k">Data</span><span class="v">'+formatarData(pedido.data)+'</span></div>' : '')
       + (pedido.obs ? '<div class="linha"><span class="k">Observações</span><span class="v">'+pedido.obs+'</span></div>' : '') + '</div>'
-    + botaoZap
     + botaoAcao;
 
-  requestAnimationFrame(()=>{ document.getElementById('enchimento-silo').style.height = pct+'%'; });
+  if(!statusNegativo){
+    const idxAtual = ETAPAS_PEDIDO.findIndex(e=>e.id===pedido.status);
+    const pct = Math.round(((idxAtual+1)/ETAPAS_PEDIDO.length)*100);
+    requestAnimationFrame(()=>{ const el = document.getElementById('enchimento-silo'); if(el) el.style.height = pct+'%'; });
+  }
 }
 
 function abrirPedidoExistente(id){ pedidoAtualId = id; renderModalAcompanhar(); abrirModal(); }
@@ -1018,10 +1094,11 @@ function renderPedidos(){
   alvo.innerHTML = '<div class="rotulo-secao">Seus pedidos</div><div class="grade-pedidos">' + PEDIDOS.map(pedido=>{
     const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
     const etapa = ETAPAS_PEDIDO.find(e=>e.id===pedido.status);
+    const rotuloBadge = etapa ? etapa.t : (STATUS_TERMINAIS_NEGATIVOS[pedido.status] ? STATUS_TERMINAIS_NEGATIVOS[pedido.status].rot : pedido.status);
     return '<button class="cartao-pedido" onclick="abrirPedidoExistente('+pedido.id+')">'
       + '<div class="ic-cat">'+iconeInline(catInfo(pedido.cat).ic,20)+'</div>'
-      + '<div class="miolo"><div class="titulo-pedido">'+p.nome+'</div><div class="sub-pedido">'+catInfo(pedido.cat).rot+' · '+pedido.local+'</div></div>'
-      + '<span class="badge-status badge-'+pedido.status+'">'+etapa.t+'</span></button>';
+      + '<div class="miolo"><div class="titulo-pedido">'+(p?p.nome:'Prestador')+'</div><div class="sub-pedido">'+catInfo(pedido.cat).rot+' · '+pedido.local+'</div></div>'
+      + '<span class="badge-status badge-'+pedido.status+'">'+rotuloBadge+'</span></button>';
   }).join('') + '</div>';
 }
 
