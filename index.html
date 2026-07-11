@@ -1457,21 +1457,43 @@ async function contarPrestadoresAprovados(){
   return count;
 }
 
+async function calcularEstatisticasPedidos(){
+  const { data, error } = await sb.from('pedidos').select('agricultor_user_id, status, criado_em');
+  if(error){ console.error('Erro ao calcular estatísticas de pedidos:', error); return { agricultoresAtivos:'—', pedidosMes:'—', taxaAceitacao:'—' }; }
+
+  const agricultoresUnicos = new Set(data.map(p=>p.agricultor_user_id).filter(Boolean));
+
+  const inicioMes = new Date();
+  inicioMes.setDate(1); inicioMes.setHours(0,0,0,0);
+  const pedidosMes = data.filter(p => new Date(p.criado_em) >= inicioMes).length;
+
+  const aceitos = data.filter(p => ['aceito','a_caminho','concluido'].includes(p.status)).length;
+  const recusados = data.filter(p => p.status === 'recusado').length;
+  const decididos = aceitos + recusados;
+  const taxaAceitacao = decididos > 0 ? Math.round((aceitos/decididos)*100) + '%' : '—';
+
+  return {
+    agricultoresAtivos: String(agricultoresUnicos.size),
+    pedidosMes: String(pedidosMes),
+    taxaAceitacao
+  };
+}
+
 async function abrirAdmin(){ document.getElementById('pagina-admin').classList.add('ativo'); await renderPainelAdmin(); }
 function voltarApp(){ document.getElementById('pagina-admin').classList.remove('ativo'); }
 
 async function renderPainelAdmin(){
   document.getElementById('miolo-admin').innerHTML = '<div class="legenda-muted" style="padding:24px">Carregando painel...</div>';
-  const [totalAprovados] = await Promise.all([contarPrestadoresAprovados(), carregarModeracao()]);
+  const [totalAprovados, estatisticasPedidos] = await Promise.all([contarPrestadoresAprovados(), calcularEstatisticasPedidos(), carregarModeracao()]);
   const maxCont = Math.max(...CONTAGEM_CATEGORIAS.map(c=>c.n));
   document.getElementById('miolo-admin').innerHTML =
     '<div class="painel-cabecalho"><div><h1>Painel administrativo</h1><p>Visão para a UEM, cooperativas e prefeituras parceiras do CONECTA rural</p></div>'
-      + '<div class="marco">Prestadores e moderação: dados reais · o restante ainda é demonstração</div></div>'
+      + '<div class="marco">Prestadores, moderação e pedidos: dados reais · categorias e municípios ainda são demonstração</div></div>'
     + '<div class="grade-estat">'
       + cartaoEstat('Prestadores cadastrados', String(totalAprovados), 'dado real')
-      + cartaoEstat('Agricultores ativos', '214', 'demonstração')
-      + cartaoEstat('Pedidos este mês', '58', 'demonstração')
-      + cartaoEstat('Taxa de aceitação', '82%', 'demonstração')
+      + cartaoEstat('Agricultores ativos', estatisticasPedidos.agricultoresAtivos, 'dado real')
+      + cartaoEstat('Pedidos este mês', estatisticasPedidos.pedidosMes, 'dado real')
+      + cartaoEstat('Taxa de aceitação', estatisticasPedidos.taxaAceitacao, 'dado real')
     + '</div>'
     + '<div class="grade-painel">'
       + '<div class="bloco-painel"><h2>Serviços mais buscados</h2>' + CONTAGEM_CATEGORIAS.map(c=>{
