@@ -720,6 +720,28 @@ function blocoGrupoWeb(titulo, categorias){
     + '</div>';
 }
 
+let raioFiltroKm = null;
+
+function distanciaKm(p){
+  if(!p.dist || p.dist === '—') return null;
+  const n = parseInt(p.dist, 10);
+  return isNaN(n) ? null : n;
+}
+
+function definirRaioFiltro(valor){
+  raioFiltroKm = valor === '' ? null : Number(valor);
+  renderBlocosInicio();
+}
+
+function seletorRaioHTML(){
+  if(!agricultorCoords) return '';
+  const opcoes = [10,25,50,100];
+  return '<select onchange="definirRaioFiltro(this.value)" style="padding:8px 10px;border-radius:8px;border:1.5px solid var(--zinco-claro);font-size:13px;font-weight:700;color:var(--tinta);background:var(--fundo-cartao,#fff)">'
+    + '<option value=""'+(raioFiltroKm===null?' selected':'')+'>Raio: Todos</option>'
+    + opcoes.map(km=>'<option value="'+km+'"'+(raioFiltroKm===km?' selected':'')+'>Até '+km+' km</option>').join('')
+    + '</select>';
+}
+
 function renderBlocosInicio(){
   const blocoCat = document.getElementById('bloco-categorias');
   const blocoRes = document.getElementById('bloco-resultados');
@@ -750,17 +772,21 @@ function renderBlocosInicio(){
     titulo = 'Resultados para "'+filtro.termo+'"';
   }
 
+  if(raioFiltroKm !== null && agricultorCoords){
+    lista = lista.filter(p => { const d = distanciaKm(p); return d !== null && d <= raioFiltroKm; });
+  }
+
   let corpo;
   if(lista.length === 0){
     corpo = '<div class="estado-vazio"><div class="ic">'+iconeInline('busca',28)+'</div>'
-      + '<p>Nenhum prestador encontrado para "'+titulo+'" nessa região. Tente outra categoria ou peça indicação à cooperativa local.</p></div>';
+      + '<p>Nenhum prestador encontrado para "'+titulo+'" nessa região. Tente outra categoria, aumente o raio ou peça indicação à cooperativa local.</p></div>';
   } else {
     corpo = '<div class="grade-prestadores">' + lista.sort((a,b)=>b.nota-a.nota).map(cartaoPrestadorHTML).join('') + '</div>';
   }
 
   blocoRes.innerHTML =
     '<div class="cabecalho-resultados"><h2>'+titulo+'</h2>'
-    + '<button class="chip-limpar" onclick="limparFiltro()">'+iconeInline('fechar',15)+' Limpar</button></div>'
+    + '<div style="display:flex;gap:8px;align-items:center">'+seletorRaioHTML()+'<button class="chip-limpar" onclick="limparFiltro()">'+iconeInline('fechar',15)+' Limpar</button></div></div>'
     + corpo;
 }
 
@@ -793,10 +819,15 @@ function limparFiltro(){ filtro = null; renderBlocosInicio(); }
 function abrirModal(){ document.getElementById('camada-modal').classList.add('ativo'); }
 function fecharModal(){ document.getElementById('camada-modal').classList.remove('ativo'); }
 
+function escaparHTML(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
 function abrirPerfilPrestador(id){
   prestadorAtual = PRESTADORES.find(p=>p.id===id);
   renderModalPerfil();
   abrirModal();
+  carregarComentariosPrestador(id);
 }
 function renderModalPerfil(){
   const p = prestadorAtual, c = catInfo(p.cat);
@@ -811,8 +842,40 @@ function renderModalPerfil(){
       + '<div class="meta"><span class="item">'+iconeInline('pino',14)+' Atende num raio de '+p.raio+' km a partir de '+p.cidade+'</span></div></div>'
     + '<div class="rotulo-secao">Serviços oferecidos</div>'
     + '<div class="cartao">'+c.rot+', a combinar conforme a necessidade da propriedade.</div>'
+    + '<div class="rotulo-secao">Avaliações recentes</div>'
+    + '<div id="lista-avaliacoes-prestador"><div class="legenda-muted">Carregando avaliações...</div></div>'
     + '<div class="grade-acoes-contato"><button class="botao botao-secundario">'+iconeInline('telefone',18)+'Ligar</button><button class="botao botao-secundario">'+iconeInline('whats',18)+'WhatsApp</button></div>'
     + '<button class="botao botao-trigo" onclick="abrirSolicitacao()">Solicitar serviço</button>';
+}
+
+async function carregarComentariosPrestador(prestadorId){
+  const { data, error } = await sb.from('avaliacoes')
+    .select('nota, comentario, criado_em')
+    .eq('prestador_id', prestadorId)
+    .order('criado_em', { ascending:false })
+    .limit(20);
+
+  const alvo = document.getElementById('lista-avaliacoes-prestador');
+  if(!alvo) return; // a pessoa já fechou o modal antes de terminar de carregar
+
+  if(error){
+    alvo.innerHTML = '<div class="legenda-muted">Não foi possível carregar as avaliações.</div>';
+    return;
+  }
+
+  const comComentario = data.filter(a => a.comentario && a.comentario.trim());
+  if(comComentario.length === 0){
+    alvo.innerHTML = '<div class="legenda-muted">Ainda não há comentários — só notas.</div>';
+    return;
+  }
+
+  alvo.innerHTML = comComentario.map(a=>{
+    const estrelas = '★'.repeat(a.nota) + '☆'.repeat(5 - a.nota);
+    return '<div class="cartao" style="margin-bottom:8px">'
+      + '<div style="color:var(--trigo);letter-spacing:2px;font-size:14px">'+estrelas+'</div>'
+      + '<div class="legenda-muted" style="margin-top:4px">'+escaparHTML(a.comentario)+'</div>'
+      + '</div>';
+  }).join('');
 }
 
 let localizacaoCapturada = null;
