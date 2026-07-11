@@ -821,15 +821,19 @@ function linkMapa(lat, lon){ return 'https://www.google.com/maps?q=' + lat + ','
 
 function abrirSolicitacao(){
   const p = prestadorAtual;
-  localizacaoCapturada = null;
+  const meta = usuarioAtual.user_metadata || {};
+  const temPropriedadeSalva = meta.propriedadeLat != null && meta.propriedadeLon != null;
+  localizacaoCapturada = temPropriedadeSalva ? { lat: meta.propriedadeLat, lon: meta.propriedadeLon } : null;
   document.getElementById('conteudo-modal').innerHTML =
     '<div class="rotulo-secao" style="margin-top:0">Solicitar serviço</div>'
     + '<div class="legenda-muted" style="margin-bottom:20px">Prestador: <strong style="color:var(--tinta)">'+p.nome+'</strong> · '+catInfo(p.cat).rot+'</div>'
-    + '<div class="grupo-campo"><label for="campo-local">Local do serviço</label><input id="campo-local" type="text" placeholder="Ex.: Linha São José, propriedade km 4" value="Minha propriedade"></div>'
-    + '<div class="grupo-campo"><label for="campo-tel-agricultor">Seu telefone (para o prestador combinar detalhes)</label><input id="campo-tel-agricultor" type="text" placeholder="(55) 9 9999-9999"></div>'
+    + '<div class="grupo-campo"><label for="campo-local">Local do serviço</label><input id="campo-local" type="text" placeholder="Ex.: Linha São José, propriedade km 4" value="'+(meta.propriedadeLocal || 'Minha propriedade')+'"></div>'
+    + '<div class="grupo-campo"><label for="campo-tel-agricultor">Seu telefone (para o prestador combinar detalhes)</label><input id="campo-tel-agricultor" type="text" value="'+(meta.telefone || '')+'" placeholder="(55) 9 9999-9999"></div>'
     + '<div class="grupo-campo"><label>Localização exata (opcional, recomendado para propriedades rurais)</label>'
       + '<button type="button" class="botao botao-secundario botao-bloco" onclick="capturarLocalizacaoPedido()">'+iconeInline('pino',18)+' Usar minha localização atual (GPS)</button>'
-      + '<div id="status-local-gps" class="legenda-muted" style="margin-top:6px">Use este botão estando na propriedade, ou peça pra alguém que esteja lá abrir o app.</div>'
+      + '<div id="status-local-gps" class="legenda-muted" style="margin-top:6px">'
+        + (temPropriedadeSalva ? iconeInline('check',13)+' Usando a localização salva da sua propriedade — <a href="'+linkMapa(meta.propriedadeLat, meta.propriedadeLon)+'" target="_blank" rel="noopener">ver no mapa</a>' : 'Use este botão estando na propriedade, ou peça pra alguém que esteja lá abrir o app.')
+      + '</div>'
     + '</div>'
     + '<div class="grupo-campo"><label for="campo-data">Data desejada</label><input id="campo-data" type="date"></div>'
     + '<div class="grupo-campo"><label for="campo-obs">Observações</label><textarea id="campo-obs" placeholder="Descreva o que precisa, tamanho da área, urgência etc."></textarea></div>'
@@ -1294,15 +1298,121 @@ function renderPerfilConta(){
     + '<div class="cartao-conta"><div class="avatar">'+iniciais(nome)+'</div><div><div class="nome">'+nome+'</div><div class="local">'+email+'</div></div></div>'
     + blocoStatusPrestador()
     + '<div class="cartao" style="padding:4px 16px">'
-      + linhaMenu('telefone','Meu telefone e contato')
-      + linhaMenu('pino','Minha propriedade e localização')
-      + linhaMenu('ajuda','Central de ajuda')
+      + linhaMenu('telefone','Meu telefone e contato','abrirEdicaoContato()')
+      + linhaMenu('pino','Minha propriedade e localização','abrirEdicaoPropriedade()')
+      + linhaMenu('ajuda','Central de ajuda','abrirCentralAjuda()')
     + '</div>'
     + '<button class="botao-perigo-fino" onclick="sair()">'+iconeInline('sair',16)+' Sair da conta</button>'
     + '</div>';
 }
-function linhaMenu(iconeNome, texto){
-  return '<button class="linha-menu"><span class="ic">'+iconeInline(iconeNome,18)+'</span><span class="txt">'+texto+'</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--zinco)">'+ICONES.seta+'</svg></button>';
+function linhaMenu(iconeNome, texto, onclick){
+  return '<button class="linha-menu" onclick="'+(onclick||'')+'"><span class="ic">'+iconeInline(iconeNome,18)+'</span><span class="txt">'+texto+'</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--zinco)">'+ICONES.seta+'</svg></button>';
+}
+
+/* ======================= MEU TELEFONE E CONTATO ======================= */
+function abrirEdicaoContato(){
+  const telefoneAtual = (usuarioAtual.user_metadata && usuarioAtual.user_metadata.telefone) || '';
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Meu telefone e contato</div>'
+    + '<div class="legenda-muted" style="margin-bottom:20px">Usado para preencher seus pedidos automaticamente e para prestadores combinarem detalhes com você.</div>'
+    + '<div class="grupo-campo"><label for="campo-meu-telefone">Telefone</label><input id="campo-meu-telefone" type="text" value="'+telefoneAtual+'" placeholder="(55) 9 9999-9999"></div>'
+    + '<div id="mensagem-contato" class="legenda-muted" style="min-height:18px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="salvarContato()">Salvar</button>';
+  abrirModal();
+}
+
+async function salvarContato(){
+  const telefone = document.getElementById('campo-meu-telefone').value.trim();
+  const msg = document.getElementById('mensagem-contato');
+  msg.textContent = 'Salvando...';
+  msg.style.color = 'var(--tinta-suave)';
+  const { data, error } = await sb.auth.updateUser({
+    data: { ...(usuarioAtual.user_metadata||{}), telefone }
+  });
+  if(error){
+    msg.textContent = 'Não foi possível salvar: ' + error.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+  usuarioAtual = data.user;
+  fecharModal();
+}
+
+/* ======================= MINHA PROPRIEDADE E LOCALIZAÇÃO ======================= */
+function abrirEdicaoPropriedade(){
+  const meta = usuarioAtual.user_metadata || {};
+  const localAtual = meta.propriedadeLocal || '';
+  const temLocalizacao = meta.propriedadeLat != null && meta.propriedadeLon != null;
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Minha propriedade e localização</div>'
+    + '<div class="legenda-muted" style="margin-bottom:20px">Salve aqui uma vez e ela preenche seus pedidos automaticamente — sem precisar capturar o GPS toda vez.</div>'
+    + '<div class="grupo-campo"><label for="campo-propriedade-nome">Nome ou referência da propriedade</label><input id="campo-propriedade-nome" type="text" value="'+localAtual+'" placeholder="Ex.: Linha Buriti Sul, Sítio do pai"></div>'
+    + '<div class="grupo-campo"><label>Localização exata (GPS)</label>'
+      + '<button type="button" class="botao botao-secundario botao-bloco" onclick="capturarLocalizacaoPropriedade()">'+iconeInline('pino',18)+' Usar minha localização atual</button>'
+      + '<div id="status-local-propriedade" class="legenda-muted" style="margin-top:6px">'
+        + (temLocalizacao ? iconeInline('check',13)+' Localização salva — <a href="'+linkMapa(meta.propriedadeLat, meta.propriedadeLon)+'" target="_blank" rel="noopener">ver no mapa</a>' : 'Nenhuma localização salva ainda.')
+      + '</div>'
+    + '</div>'
+    + '<div id="mensagem-propriedade" class="legenda-muted" style="min-height:18px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="salvarPropriedade()">Salvar</button>';
+  localizacaoPropriedadeCapturada = temLocalizacao ? { lat: meta.propriedadeLat, lon: meta.propriedadeLon } : null;
+  abrirModal();
+}
+
+let localizacaoPropriedadeCapturada = null;
+
+function capturarLocalizacaoPropriedade(){
+  const status = document.getElementById('status-local-propriedade');
+  if(!navigator.geolocation){ status.textContent = 'Seu navegador não suporta captura de localização.'; status.style.color = 'var(--perigo)'; return; }
+  status.textContent = 'Obtendo localização...';
+  status.style.color = 'var(--tinta-suave)';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      localizacaoPropriedadeCapturada = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      status.innerHTML = iconeInline('check',13) + ' Localização capturada — <a href="'+linkMapa(localizacaoPropriedadeCapturada.lat, localizacaoPropriedadeCapturada.lon)+'" target="_blank" rel="noopener">ver no mapa</a>';
+      status.style.color = 'var(--tinta)';
+    },
+    () => { status.textContent = 'Não foi possível obter a localização. Verifique a permissão de GPS.'; status.style.color = 'var(--perigo)'; },
+    { timeout: 10000, enableHighAccuracy: true }
+  );
+}
+
+async function salvarPropriedade(){
+  const propriedadeLocal = document.getElementById('campo-propriedade-nome').value.trim();
+  const msg = document.getElementById('mensagem-propriedade');
+  msg.textContent = 'Salvando...';
+  msg.style.color = 'var(--tinta-suave)';
+  const { data, error } = await sb.auth.updateUser({
+    data: {
+      ...(usuarioAtual.user_metadata||{}),
+      propriedadeLocal,
+      propriedadeLat: localizacaoPropriedadeCapturada ? localizacaoPropriedadeCapturada.lat : null,
+      propriedadeLon: localizacaoPropriedadeCapturada ? localizacaoPropriedadeCapturada.lon : null
+    }
+  });
+  if(error){
+    msg.textContent = 'Não foi possível salvar: ' + error.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+  usuarioAtual = data.user;
+  fecharModal();
+}
+
+/* ======================= CENTRAL DE AJUDA ======================= */
+function abrirCentralAjuda(){
+  const perguntas = [
+    { p:'Como peço um serviço?', r:'Toque numa categoria na tela inicial, escolha um prestador e toque em "Solicitar". Preencha o local (ou use sua localização salva) e envie.' },
+    { p:'Como cancelo um pedido?', r:'Só é possível cancelar enquanto o prestador ainda não aceitou. Depois do aceite, combine diretamente com ele pelo WhatsApp.' },
+    { p:'Como funciona o cadastro de prestador?', r:'Qualquer pessoa pode se cadastrar como prestador pela aba Perfil. O cadastro passa por aprovação de um administrador antes de aparecer nas buscas.' },
+    { p:'Meu cadastro de prestador foi recusado ou quero parar de atender. E agora?', r:'Você pode editar e reenviar seu cadastro, ou desativá-lo a qualquer momento pela aba Perfil.' },
+    { p:'Como avalio um prestador?', r:'Depois que o pedido estiver marcado como "Concluído", um botão de avaliação aparece no acompanhamento do pedido.' },
+  ];
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Central de ajuda</div>'
+    + perguntas.map(item=>'<div class="cartao" style="margin-bottom:10px"><div style="font-weight:800">'+item.p+'</div><div class="legenda-muted" style="margin-top:4px">'+item.r+'</div></div>').join('')
+    + '<div class="legenda-muted" style="text-align:center;margin-top:12px">Não encontrou o que precisava? Fale com o administrador do CampoFácil.</div>';
+  abrirModal();
 }
 async function sair(){
   await sb.auth.signOut();
