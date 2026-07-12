@@ -346,6 +346,7 @@
     <div id="mensagem-login" class="legenda-muted" style="min-height:18px; margin-bottom:12px;"></div>
     <button class="botao botao-primario botao-bloco" onclick="entrarComEmail()">Entrar</button>
     <button class="botao botao-secundario botao-bloco" style="margin-top:10px" onclick="criarContaComEmail()">Criar conta nova</button>
+    <button class="botao-perigo-fino" style="margin-top:14px;color:var(--tinta-suave)" onclick="abrirRecuperarSenha()">Esqueci minha senha</button>
   </div>
 </div>
 
@@ -655,6 +656,61 @@ async function criarContaComEmail(){
   await iniciarApp();
 }
 
+/* ======================= RECUPERAR SENHA ======================= */
+function abrirRecuperarSenha(){
+  const cartao = document.querySelector('#pagina-login .cartao-login');
+  cartao.innerHTML =
+    '<div class="selo-grande" id="icone-login-aux"></div>'
+    + '<h1>Recuperar senha</h1>'
+    + '<p class="tagline">Informe seu e-mail — vamos te mandar um link pra criar uma senha nova.</p>'
+    + '<div class="grupo-campo"><label for="input-email-recuperar">E-mail</label><input id="input-email-recuperar" type="email" placeholder="seuemail@exemplo.com"></div>'
+    + '<div id="mensagem-recuperar" class="legenda-muted" style="min-height:18px;margin-bottom:12px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="enviarLinkRecuperacao()">Enviar link de recuperação</button>'
+    + '<button class="botao-perigo-fino" style="margin-top:14px;color:var(--tinta-suave)" onclick="location.reload()">Voltar para o login</button>';
+  document.getElementById('icone-login-aux').innerHTML = iconeInline('logo', 34);
+}
+
+async function enviarLinkRecuperacao(){
+  const email = document.getElementById('input-email-recuperar').value.trim();
+  const msg = document.getElementById('mensagem-recuperar');
+  if(!email){ msg.textContent = 'Informe seu e-mail.'; msg.style.color = 'var(--perigo)'; return; }
+  msg.textContent = 'Enviando...';
+  msg.style.color = 'var(--tinta-suave)';
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+  if(error){ msg.textContent = 'Não foi possível enviar: ' + error.message; msg.style.color = 'var(--perigo)'; return; }
+  msg.textContent = 'Link enviado! Verifique seu e-mail (inclusive a caixa de spam) e clique nele.';
+  msg.style.color = 'var(--tinta)';
+}
+
+function mostrarFormularioNovaSenha(){
+  const cartao = document.querySelector('#pagina-login .cartao-login');
+  cartao.innerHTML =
+    '<div class="selo-grande" id="icone-login-aux"></div>'
+    + '<h1>Nova senha</h1>'
+    + '<p class="tagline">Crie uma nova senha para sua conta.</p>'
+    + '<div class="grupo-campo"><label for="input-nova-senha">Nova senha</label><input id="input-nova-senha" type="password" placeholder="Mínimo 6 caracteres"></div>'
+    + '<div id="mensagem-nova-senha" class="legenda-muted" style="min-height:18px;margin-bottom:12px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="salvarNovaSenha()">Salvar nova senha</button>';
+  document.getElementById('icone-login-aux').innerHTML = iconeInline('logo', 34);
+}
+
+async function salvarNovaSenha(){
+  const novaSenha = document.getElementById('input-nova-senha').value;
+  const msg = document.getElementById('mensagem-nova-senha');
+  if(!novaSenha || novaSenha.length < 6){ msg.textContent = 'A senha precisa ter pelo menos 6 caracteres.'; msg.style.color = 'var(--perigo)'; return; }
+  msg.textContent = 'Salvando...';
+  msg.style.color = 'var(--tinta-suave)';
+  const { error } = await sb.auth.updateUser({ password: novaSenha });
+  if(error){ msg.textContent = 'Não foi possível salvar: ' + error.message; msg.style.color = 'var(--perigo)'; return; }
+  msg.textContent = 'Senha atualizada! Redirecionando...';
+  msg.style.color = 'var(--tinta)';
+  setTimeout(()=>{ location.href = window.location.origin + window.location.pathname; }, 1200);
+}
+
+sb.auth.onAuthStateChange((event) => {
+  if(event === 'PASSWORD_RECOVERY') mostrarFormularioNovaSenha();
+});
+
 async function iniciarApp(){
   const { data:{ user } } = await sb.auth.getUser();
   usuarioAtual = user;
@@ -673,6 +729,26 @@ async function iniciarApp(){
   }
   renderInicio();
   atualizarLocalizacaoEDistancias(); // não bloqueia a tela — atualiza sozinho quando/se autorizado
+  mostrarOnboardingSeNecessario();
+}
+
+function mostrarOnboardingSeNecessario(){
+  if(localStorage.getItem('campofacil_onboarding_visto')) return;
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Bem-vindo ao CampoFácil</div>'
+    + '<div class="legenda-muted" style="margin-bottom:16px">Um resumo rápido de como usar:</div>'
+    + '<div class="cartao" style="margin-bottom:8px"><strong>1. Busque um serviço</strong><div class="legenda-muted">Escolha uma categoria na tela inicial ou use a busca.</div></div>'
+    + '<div class="cartao" style="margin-bottom:8px"><strong>2. Solicite</strong><div class="legenda-muted">Abra o perfil do prestador e toque em "Solicitar serviço".</div></div>'
+    + '<div class="cartao" style="margin-bottom:8px"><strong>3. Acompanhe</strong><div class="legenda-muted">Veja o status na aba "Pedidos" — do envio até a conclusão.</div></div>'
+    + '<div class="cartao" style="margin-bottom:16px"><strong>4. Avalie</strong><div class="legenda-muted">Depois de concluído, avalie o prestador para ajudar outros agricultores.</div></div>'
+    + '<div class="legenda-muted" style="margin-bottom:12px">Também é prestador de serviço? Vá em Perfil e cadastre-se por lá.</div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="fecharOnboarding()">Entendi, vamos lá</button>';
+  abrirModal();
+}
+
+function fecharOnboarding(){
+  localStorage.setItem('campofacil_onboarding_visto', 'true');
+  fecharModal();
 }
 
 function nomeExibicao(){
@@ -993,6 +1069,60 @@ async function carregarAvaliacoesFeitas(){
   PEDIDOS_AVALIADOS = new Set(data.map(a => a.pedido_id));
 }
 
+function abrirEdicaoPedido(){
+  const pedido = pedidoPorId(pedidoAtualId);
+  const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
+  const categoriasDoPrestador = p ? [p.cat, ...p.catsExtras] : [pedido.cat];
+  const seletorServico = categoriasDoPrestador.length > 1
+    ? '<div class="grupo-campo"><label for="campo-servico-pedido">Serviço</label>'
+      + '<select id="campo-servico-pedido" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro);font-size:15px">'
+        + categoriasDoPrestador.map(id=>'<option value="'+id+'" '+(id===pedido.cat?'selected':'')+'>'+catInfo(id).rot+'</option>').join('')
+      + '</select></div>'
+    : '<input type="hidden" id="campo-servico-pedido" value="'+pedido.cat+'">';
+
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Editar pedido</div>'
+    + seletorServico
+    + '<div class="grupo-campo"><label for="campo-local">Local do serviço</label><input id="campo-local" type="text" value="'+pedido.local+'"></div>'
+    + '<div class="grupo-campo"><label for="campo-tel-agricultor">Seu telefone</label><input id="campo-tel-agricultor" type="text" value="'+(pedido.agricultorTelefone||'')+'" placeholder="(55) 9 9999-9999"></div>'
+    + '<div class="grupo-campo"><label for="campo-data">Data desejada</label><input id="campo-data" type="date" value="'+(pedido.data||'')+'"></div>'
+    + '<div class="grupo-campo"><label for="campo-obs">Observações</label><textarea id="campo-obs" placeholder="Descreva o que precisa">'+(pedido.obs||'')+'</textarea></div>'
+    + '<div id="mensagem-edicao-pedido" class="legenda-muted" style="min-height:18px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="salvarEdicaoPedido()">Salvar alterações</button>';
+}
+
+async function salvarEdicaoPedido(){
+  const pedido = pedidoPorId(pedidoAtualId);
+  const local = document.getElementById('campo-local').value || 'Minha propriedade';
+  const telAgricultor = document.getElementById('campo-tel-agricultor').value.trim();
+  const data = document.getElementById('campo-data').value;
+  const obs = document.getElementById('campo-obs').value;
+  const categoriaEscolhida = document.getElementById('campo-servico-pedido').value;
+  const msg = document.getElementById('mensagem-edicao-pedido');
+
+  msg.textContent = 'Salvando...';
+  msg.style.color = 'var(--tinta-suave)';
+
+  const { data: atualizado, error } = await sb.from('pedidos')
+    .update({ local, categoria_id: categoriaEscolhida, agricultor_telefone: telAgricultor || null, data_desejada: data || null, observacoes: obs })
+    .eq('id', pedido.id)
+    .select()
+    .maybeSingle();
+
+  if(error){
+    msg.textContent = 'Não foi possível salvar: ' + error.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  pedido.local = atualizado.local;
+  pedido.cat = atualizado.categoria_id;
+  pedido.agricultorTelefone = atualizado.agricultor_telefone;
+  pedido.data = atualizado.data_desejada;
+  pedido.obs = atualizado.observacoes;
+  renderModalAcompanhar();
+}
+
 async function enviarPedido(){
   const local = document.getElementById('campo-local').value || 'Minha propriedade';
   const telAgricultor = document.getElementById('campo-tel-agricultor').value.trim();
@@ -1157,7 +1287,8 @@ function renderModalAcompanhar(){
     } else if(souOAgricultor){
       const podeCancelar = pedido.status === 'solicitado';
       botaoAcao = botaoZapPrestador + (podeCancelar
-        ? '<button class="botao botao-secundario botao-bloco" style="color:var(--perigo);border-color:var(--perigo)" onclick="cancelarPedido()">Cancelar pedido</button>'
+        ? '<button class="botao botao-secundario botao-bloco" style="margin-bottom:10px" onclick="abrirEdicaoPedido()">Editar pedido</button>'
+          + '<button class="botao botao-secundario botao-bloco" style="color:var(--perigo);border-color:var(--perigo)" onclick="cancelarPedido()">Cancelar pedido</button>'
         : '<div class="legenda-muted" style="text-align:center;margin-top:6px">O prestador já aceitou o pedido — para desmarcar, combine diretamente com ele.</div>');
     } else {
       botaoAcao = '<div class="legenda-muted" style="text-align:center;margin-top:6px">Aguardando o prestador atualizar o status.</div>';
@@ -1424,7 +1555,8 @@ function renderPedidos(){
       + '<button class="botao botao-primario" onclick="trocarAba(\'tela-inicio\')">Ir para o início</button></div>';
     return;
   }
-  alvo.innerHTML = '<div class="rotulo-secao">Seus pedidos</div><div class="grade-pedidos">' + PEDIDOS.map(pedido=>{
+
+  const cardHTML = pedido => {
     const p = PRESTADORES.find(pr=>pr.id===pedido.prestadorId);
     const etapa = ETAPAS_PEDIDO.find(e=>e.id===pedido.status);
     const rotuloBadge = etapa ? etapa.t : (STATUS_TERMINAIS_NEGATIVOS[pedido.status] ? STATUS_TERMINAIS_NEGATIVOS[pedido.status].rot : pedido.status);
@@ -1432,7 +1564,22 @@ function renderPedidos(){
       + '<div class="ic-cat">'+iconeInline(catInfo(pedido.cat).ic,20)+'</div>'
       + '<div class="miolo"><div class="titulo-pedido">'+(p?p.nome:'Prestador')+'</div><div class="sub-pedido">'+catInfo(pedido.cat).rot+' · '+pedido.local+'</div></div>'
       + '<span class="badge-status badge-'+pedido.status+'">'+rotuloBadge+'</span></button>';
-  }).join('') + '</div>';
+  };
+
+  if(!meuCadastroPrestador){
+    alvo.innerHTML = '<div class="rotulo-secao">Seus pedidos</div><div class="grade-pedidos">' + PEDIDOS.map(cardHTML).join('') + '</div>';
+    return;
+  }
+
+  // Quem também é prestador vê os dois lados separados: o que pediu como
+  // agricultor, e o que recebeu como prestador (histórico de atendimentos).
+  const comoAgricultor = PEDIDOS.filter(p => p.agricultorUserId === usuarioAtual.id);
+  const comoPrestador = PEDIDOS.filter(p => p.prestadorId === meuCadastroPrestador.id);
+  alvo.innerHTML =
+    '<div class="rotulo-secao">Meus atendimentos (como prestador)</div>'
+    + (comoPrestador.length ? '<div class="grade-pedidos">' + comoPrestador.map(cardHTML).join('') + '</div>' : '<div class="legenda-muted" style="margin-bottom:20px">Nenhum pedido recebido ainda.</div>')
+    + '<div class="rotulo-secao" style="margin-top:24px">Meus pedidos (como agricultor)</div>'
+    + (comoAgricultor.length ? '<div class="grade-pedidos">' + comoAgricultor.map(cardHTML).join('') + '</div>' : '<div class="legenda-muted">Você ainda não solicitou nenhum serviço.</div>');
 }
 
 /* ======================= PERFIL / CONTA ======================= */
