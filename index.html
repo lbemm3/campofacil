@@ -504,8 +504,15 @@ async function carregarDados(){
   PRESTADORES = preds.map(p => ({
     id:p.id, nome:p.nome, cat:p.categoria_id, cidade:p.cidade, raio:p.raio_km,
     nota:Number(p.nota), avaliacoes:p.avaliacoes, verificado:true, dist:'—', telefone:p.telefone,
-    fotoUrl:p.foto_url, servicosConcluidos:p.servicos_concluidos||0
+    fotoUrl:p.foto_url, servicosConcluidos:p.servicos_concluidos||0, catsExtras:[]
   }));
+
+  const { data: extras, error: errExtras } = await sb.from('prestador_categorias').select('prestador_id, categoria_id');
+  if(!errExtras && extras){
+    const porPrestador = {};
+    extras.forEach(e => { (porPrestador[e.prestador_id] = porPrestador[e.prestador_id] || []).push(e.categoria_id); });
+    PRESTADORES.forEach(p => { p.catsExtras = porPrestador[p.id] || []; });
+  }
   return true;
 }
 const ETAPAS_PEDIDO = [
@@ -781,7 +788,7 @@ function renderBlocosInicio(){
   blocoCat.innerHTML = '';
   let lista, titulo;
   if(filtro.tipo === 'categoria'){
-    lista = PRESTADORES.filter(p=>p.cat===filtro.id);
+    lista = PRESTADORES.filter(p=>p.cat===filtro.id || p.catsExtras.includes(filtro.id));
     titulo = catInfo(filtro.id).rot;
   } else {
     const termo = filtro.termo;
@@ -813,7 +820,7 @@ function cartaoPrestadorHTML(p){
     + avatarHTML(p.nome, p.fotoUrl)
     + '<div class="info-prestador">'
       + '<div class="linha1"><span class="nome">'+p.nome+'</span>'+(p.verificado?'<span class="selo-verificado">'+iconeInline('check',10)+'Verif.</span>':'')+'</div>'
-      + '<div class="categoria-tag">'+c.rot+' · '+p.cidade+'</div>'
+      + '<div class="categoria-tag">'+c.rot+(p.catsExtras.length ? ' +'+p.catsExtras.length : '')+' · '+p.cidade+'</div>'
       + '<div class="meta"><span class="item estrela">'+iconeInline('estrela',14)+' '+p.nota.toFixed(1)+' ('+p.avaliacoes+')</span><span class="item">'+iconeInline('pino',14)+' '+p.dist+'</span></div>'
     + '</div></button>';
 }
@@ -860,7 +867,7 @@ function renderModalPerfil(){
       + '<div class="linha-tracejada"></div>'
       + '<div class="meta"><span class="item">'+iconeInline('pino',14)+' Atende num raio de '+p.raio+' km a partir de '+p.cidade+'</span></div></div>'
     + '<div class="rotulo-secao">Serviços oferecidos</div>'
-    + '<div class="cartao">'+c.rot+', a combinar conforme a necessidade da propriedade.</div>'
+    + '<div class="cartao">' + [c.rot].concat(p.catsExtras.map(id=>catInfo(id).rot)).join(' · ') + ', a combinar conforme a necessidade da propriedade.</div>'
     + '<div class="rotulo-secao">Avaliações recentes</div>'
     + '<div id="lista-avaliacoes-prestador"><div class="legenda-muted">Carregando avaliações...</div></div>'
     + '<button class="botao botao-trigo" onclick="abrirSolicitacao()">Solicitar serviço</button>';
@@ -1022,8 +1029,9 @@ async function avancarStatus(){
 const MOTIVOS_RECUSA = [
   'Agenda cheia no momento',
   'Fora da minha área de atendimento',
-  'Não atendo esse tipo de serviço',
-  'Preço não é viável',
+  'Não atendo mais esse tipo de serviço',
+  'Máquina ou equipamento em manutenção',
+  'Prazo solicitado é muito curto',
 ];
 
 function abrirRecusaPedido(){
@@ -1273,7 +1281,7 @@ async function enviarCadastroPrestador(){
   renderPerfilConta();
 }
 
-function abrirEdicaoPrestador(){
+async function abrirEdicaoPrestador(){
   const c = meuCadastroPrestador;
   const opcoesCategorias = CATEGORIAS.map(cat=>'<option value="'+cat.id+'" '+(cat.id===c.categoria_id?'selected':'')+'>'+cat.rot+'</option>').join('');
   document.getElementById('conteudo-modal').innerHTML =
@@ -1285,8 +1293,11 @@ function abrirEdicaoPrestador(){
       + '<div id="mensagem-foto-prestador" class="legenda-muted" style="margin-top:6px"></div>'
     + '</div>'
     + '<div class="grupo-campo"><label for="campo-prestador-nome">Seu nome ou nome da empresa</label><input id="campo-prestador-nome" type="text" value="'+c.nome+'"></div>'
-    + '<div class="grupo-campo"><label for="campo-prestador-categoria">Categoria de serviço</label>'
+    + '<div class="grupo-campo"><label for="campo-prestador-categoria">Categoria principal</label>'
       + '<select id="campo-prestador-categoria" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro);font-size:15px">'+opcoesCategorias+'</select></div>'
+    + '<div class="grupo-campo"><label>Outros serviços que você também oferece (opcional)</label>'
+      + '<div id="lista-servicos-extras" class="legenda-muted">Carregando...</div>'
+    + '</div>'
     + '<div class="grupo-campo"><label for="campo-prestador-cidade">Cidade</label><input id="campo-prestador-cidade" type="text" value="'+c.cidade+'"></div>'
     + '<div class="grupo-campo"><label for="campo-prestador-raio">Raio de atendimento (km)</label><input id="campo-prestador-raio" type="number" value="'+c.raio_km+'" min="5" max="200"></div>'
     + '<div class="grupo-campo"><label for="campo-prestador-telefone">Telefone de contato</label><input id="campo-prestador-telefone" type="text" value="'+(c.telefone||'')+'" placeholder="(55) 9 9999-9999"></div>'
@@ -1294,6 +1305,17 @@ function abrirEdicaoPrestador(){
     + '<button class="botao botao-primario botao-bloco" onclick="salvarEdicaoPrestador()">Salvar alterações</button>'
     + '<button class="botao botao-secundario botao-bloco" style="margin-top:10px;color:var(--perigo);border-color:var(--perigo)" onclick="excluirCadastroPrestador()">Desativar meu cadastro de prestador</button>';
   abrirModal();
+
+  const { data: extras } = await sb.from('prestador_categorias').select('categoria_id').eq('prestador_id', c.id);
+  const idsExtras = new Set((extras||[]).map(e=>e.categoria_id));
+  const lista = document.getElementById('lista-servicos-extras');
+  if(lista){
+    lista.innerHTML = CATEGORIAS.filter(cat=>cat.id !== c.categoria_id).map(cat=>
+      '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-weight:600;color:var(--tinta)">'
+        + '<input type="checkbox" class="chk-servico-extra" value="'+cat.id+'" '+(idsExtras.has(cat.id)?'checked':'')+'> '+cat.rot
+      + '</label>'
+    ).join('');
+  }
 }
 
 async function enviarFotoPrestador(inputEl){
@@ -1339,6 +1361,7 @@ async function salvarEdicaoPrestador(){
   const cidade = document.getElementById('campo-prestador-cidade').value.trim();
   const raio_km = Number(document.getElementById('campo-prestador-raio').value) || 30;
   const telefone = document.getElementById('campo-prestador-telefone').value.trim();
+  const extrasSelecionados = Array.from(document.querySelectorAll('.chk-servico-extra:checked')).map(el=>el.value);
   const msg = document.getElementById('mensagem-cadastro-prestador');
 
   if(!nome || !cidade){
@@ -1360,6 +1383,15 @@ async function salvarEdicaoPrestador(){
     msg.textContent = 'Não foi possível salvar: ' + error.message;
     msg.style.color = 'var(--perigo)';
     return;
+  }
+
+  // Regrava as categorias extras do zero (mais simples que calcular a diferença)
+  await sb.from('prestador_categorias').delete().eq('prestador_id', meuCadastroPrestador.id);
+  const semDuplicarPrincipal = extrasSelecionados.filter(id => id !== categoria_id);
+  if(semDuplicarPrincipal.length){
+    await sb.from('prestador_categorias').insert(
+      semDuplicarPrincipal.map(id => ({ prestador_id: meuCadastroPrestador.id, categoria_id: id }))
+    );
   }
 
   meuCadastroPrestador = data;
