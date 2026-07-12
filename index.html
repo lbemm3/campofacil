@@ -343,10 +343,11 @@
       <label for="input-senha">Senha</label>
       <input id="input-senha" type="password" placeholder="Sua senha" autocomplete="current-password">
     </div>
-    <div id="mensagem-login" class="legenda-muted" style="min-height:18px; margin-bottom:12px;"></div>
+    <div id="mensagem-login" class="legenda-muted" style="min-height:0; margin-bottom:6px;"></div>
     <button class="botao botao-primario botao-bloco" onclick="entrarComEmail()">Entrar</button>
     <button class="botao botao-secundario botao-bloco" style="margin-top:10px" onclick="criarContaComEmail()">Criar conta nova</button>
     <button class="botao-perigo-fino" style="margin-top:14px;color:var(--tinta-suave)" onclick="abrirRecuperarSenha()">Esqueci minha senha</button>
+    <button class="botao-perigo-fino" style="margin-top:4px;color:var(--tinta-suave);font-size:12px" onclick="abrirTermos()">Termos de uso e Privacidade</button>
   </div>
 </div>
 
@@ -413,6 +414,39 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Isso só controla se o BOTÃO aparece — quem realmente pode aprovar/recusar
 // prestadores é controlado no banco de dados (tabela "administradores").
 const ADMIN_EMAILS = ['lbemm3@gmail.com'];
+
+/* ======================= TERMOS DE USO E PRIVACIDADE ======================= */
+const TERMOS_TEXTO_HTML =
+  '<div class="cartao" style="margin-bottom:10px"><strong>O que é o CampoFácil</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">O CampoFácil é uma plataforma que conecta agricultores a prestadores de serviço rural na região. O app apenas facilita o contato entre as partes — não participa, garante nem se responsabiliza pela negociação, execução ou pagamento dos serviços combinados.</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><strong>Cadastro e conta</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">Você é responsável pela veracidade dos dados informados e por manter sua senha em sigilo. Cadastros de prestador passam por aprovação antes de ficarem visíveis publicamente.</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><strong>Pagamentos e negociação</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">Valores, prazos e condições são combinados diretamente entre agricultor e prestador (geralmente pelo WhatsApp), fora do app. O CampoFácil não processa pagamentos.</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><strong>Dados que coletamos</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">Nome, e-mail, telefone (opcional) e, quando você autorizar, sua localização — usada só para calcular distância e ajudar a localizar a propriedade num pedido. Você pode revogar essa permissão a qualquer momento nas configurações do navegador.</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><strong>Onde seus dados ficam guardados</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">Usamos o Supabase (infraestrutura de banco de dados) para armazenar as informações do app, com controles de acesso que restringem cada pessoa aos seus próprios dados, salvo o que é necessariamente público (como o perfil de um prestador aprovado).</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><strong>Avaliações</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">Só é possível avaliar um prestador depois de um pedido concluído com ele. Avaliações e comentários ficam públicos no perfil do prestador, sem identificar quem escreveu.</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><strong>Excluir sua conta ou dados</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">Você pode desativar seu cadastro de prestador a qualquer momento pelo próprio app. Para excluir sua conta de login por completo, entre em contato com o administrador do CampoFácil.</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><strong>Alterações nestes termos</strong>'
+    + '<div class="legenda-muted" style="margin-top:4px">Este é um projeto em desenvolvimento contínuo, ligado ao CONECTA Rural (UEM). Estes termos podem ser atualizados conforme o app evolui.</div></div>';
+
+function conteudoTermosHTML(){
+  return '<div class="rotulo-secao" style="margin-top:0">Termos de Uso e Privacidade</div>' + TERMOS_TEXTO_HTML;
+}
+
+function abrirTermos(){
+  const dentroDoApp = !document.getElementById('aplicativo').classList.contains('oculto');
+  if(dentroDoApp){
+    document.getElementById('conteudo-modal').innerHTML = conteudoTermosHTML() + '<button class="botao botao-primario botao-bloco" style="margin-top:8px" onclick="fecharModal()">Fechar</button>';
+    abrirModal();
+  } else {
+    document.querySelector('#pagina-login .cartao-login').innerHTML = conteudoTermosHTML() + '<button class="botao botao-primario botao-bloco" style="margin-top:8px" onclick="location.reload()">Voltar para o login</button>';
+  }
+}
 
 /* ======================= ÍCONES ======================= */
 function ic(inner, size){ size = size || 24; return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+inner+'</svg>'; }
@@ -729,7 +763,15 @@ async function iniciarApp(){
   }
   renderInicio();
   atualizarLocalizacaoEDistancias(); // não bloqueia a tela — atualiza sozinho quando/se autorizado
+  abrirPerfilCompartilhadoSeHouver();
   mostrarOnboardingSeNecessario();
+}
+
+function abrirPerfilCompartilhadoSeHouver(){
+  const idCompartilhado = new URLSearchParams(window.location.search).get('prestador');
+  if(!idCompartilhado) return;
+  const p = PRESTADORES.find(pr => String(pr.id) === idCompartilhado);
+  if(p) abrirPerfilPrestador(p.id);
 }
 
 function mostrarOnboardingSeNecessario(){
@@ -933,6 +975,12 @@ function abrirPerfilPrestador(id){
   abrirModal();
   carregarComentariosPrestador(id);
 }
+
+function compartilharPerfil(){
+  const link = window.location.origin + window.location.pathname + '?prestador=' + prestadorAtual.id;
+  const msg = 'Confira ' + prestadorAtual.nome + ' (' + catInfo(prestadorAtual.cat).rot + ') no CampoFácil: ' + link;
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
 function renderModalPerfil(){
   const p = prestadorAtual, c = catInfo(p.cat);
   document.getElementById('conteudo-modal').innerHTML =
@@ -950,6 +998,7 @@ function renderModalPerfil(){
     + '<div class="cartao">' + [c.rot].concat(p.catsExtras.map(id=>catInfo(id).rot)).join(' · ') + ', a combinar conforme a necessidade da propriedade.</div>'
     + '<div class="rotulo-secao">Avaliações recentes</div>'
     + '<div id="lista-avaliacoes-prestador"><div class="legenda-muted">Carregando avaliações...</div></div>'
+    + '<button class="botao botao-secundario botao-bloco" onclick="compartilharPerfil()">'+iconeInline('whats',18)+' Compartilhar perfil</button>'
     + '<button class="botao botao-trigo" onclick="abrirSolicitacao()">Solicitar serviço</button>';
 }
 
@@ -1575,8 +1624,21 @@ function renderPedidos(){
   // agricultor, e o que recebeu como prestador (histórico de atendimentos).
   const comoAgricultor = PEDIDOS.filter(p => p.agricultorUserId === usuarioAtual.id);
   const comoPrestador = PEDIDOS.filter(p => p.prestadorId === meuCadastroPrestador.id);
+
+  const concluidos = comoPrestador.filter(p=>p.status==='concluido').length;
+  const aceitos = comoPrestador.filter(p=>['aceito','a_caminho','concluido'].includes(p.status)).length;
+  const recusados = comoPrestador.filter(p=>p.status==='recusado').length;
+  const decididos = aceitos + recusados;
+  const taxaAceitacao = decididos > 0 ? Math.round((aceitos/decididos)*100)+'%' : '—';
+  const statsPrestador = '<div class="cartao" style="display:flex;justify-content:space-around;text-align:center;margin-bottom:16px">'
+    + '<div><div style="font-weight:800;font-size:20px">'+comoPrestador.length+'</div><div class="legenda-muted" style="font-size:12px">Recebidos</div></div>'
+    + '<div><div style="font-weight:800;font-size:20px">'+concluidos+'</div><div class="legenda-muted" style="font-size:12px">Concluídos</div></div>'
+    + '<div><div style="font-weight:800;font-size:20px">'+taxaAceitacao+'</div><div class="legenda-muted" style="font-size:12px">Taxa de aceitação</div></div>'
+    + '</div>';
+
   alvo.innerHTML =
     '<div class="rotulo-secao">Meus atendimentos (como prestador)</div>'
+    + statsPrestador
     + (comoPrestador.length ? '<div class="grade-pedidos">' + comoPrestador.map(cardHTML).join('') + '</div>' : '<div class="legenda-muted" style="margin-bottom:20px">Nenhum pedido recebido ainda.</div>')
     + '<div class="rotulo-secao" style="margin-top:24px">Meus pedidos (como agricultor)</div>'
     + (comoAgricultor.length ? '<div class="grade-pedidos">' + comoAgricultor.map(cardHTML).join('') + '</div>' : '<div class="legenda-muted">Você ainda não solicitou nenhum serviço.</div>');
@@ -1596,15 +1658,40 @@ function blocoStatusPrestador(){
       + '<button class="botao botao-secundario botao-bloco" style="margin-top:12px" onclick="reativarCadastroPrestador()">Reativar cadastro</button>'
       + '</div>';
   }
+  if(meuCadastroPrestador.status === 'pausado'){
+    const c = catInfo(meuCadastroPrestador.categoria_id);
+    return '<div class="cartao" style="margin-bottom:16px">'
+      + '<div style="font-weight:800">Meu cadastro de prestador</div>'
+      + '<div class="categoria-tag">'+(c?c.rot:meuCadastroPrestador.categoria_id)+' · '+meuCadastroPrestador.cidade+'</div>'
+      + '<div style="margin-top:6px;font-weight:700;color:var(--zinco)">Pausado temporariamente — você não aparece nas buscas até retomar</div>'
+      + '<button class="botao botao-trigo botao-bloco" style="margin-top:12px" onclick="retomarAtendimento()">Retomar atendimento</button>'
+      + '</div>';
+  }
   const statusTexto = { pendente:'Aguardando aprovação', aprovado:'Aprovado ✓', recusado:'Cadastro recusado' }[meuCadastroPrestador.status] || meuCadastroPrestador.status;
   const c = catInfo(meuCadastroPrestador.categoria_id);
-  return '<button class="cartao" style="margin-bottom:16px;text-align:left;width:100%;cursor:pointer" onclick="abrirEdicaoPrestador()">'
+  return '<button class="cartao" style="margin-bottom:8px;text-align:left;width:100%;cursor:pointer" onclick="abrirEdicaoPrestador()">'
     + '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
       + '<div><div style="font-weight:800">Meu cadastro de prestador</div>'
       + '<div class="categoria-tag">'+(c?c.rot:meuCadastroPrestador.categoria_id)+' · '+meuCadastroPrestador.cidade+'</div>'
       + '<div style="margin-top:6px;font-weight:700">'+statusTexto+'</div></div>'
       + '<span style="color:var(--zinco)">'+iconeInline('seta',18)+'</span>'
-    + '</div></button>';
+    + '</div></button>'
+    + (meuCadastroPrestador.status === 'aprovado' ? '<button class="botao botao-secundario botao-bloco" style="margin-bottom:16px" onclick="pausarAtendimento()">Pausar atendimento temporariamente</button>' : '');
+}
+
+async function pausarAtendimento(){
+  if(!confirm('Pausar seu atendimento? Você some das buscas até retomar, mas não precisa de nova aprovação pra voltar.')) return;
+  const { data, error } = await sb.from('prestadores').update({ status:'pausado' }).eq('id', meuCadastroPrestador.id).select().maybeSingle();
+  if(error){ alert('Não foi possível pausar: ' + error.message); return; }
+  meuCadastroPrestador = data;
+  renderPerfilConta();
+}
+
+async function retomarAtendimento(){
+  const { data, error } = await sb.from('prestadores').update({ status:'aprovado' }).eq('id', meuCadastroPrestador.id).select().maybeSingle();
+  if(error){ alert('Não foi possível retomar: ' + error.message); return; }
+  meuCadastroPrestador = data;
+  renderPerfilConta();
 }
 
 async function reativarCadastroPrestador(){
@@ -1645,6 +1732,7 @@ function renderPerfilConta(){
       + linhaMenu('telefone','Meus dados (nome e telefone)','abrirEdicaoContato()')
       + linhaMenu('pino','Minha propriedade e localização','abrirEdicaoPropriedade()')
       + linhaMenu('ajuda','Central de ajuda','abrirCentralAjuda()')
+      + linhaMenu('clip','Termos de uso e Privacidade','abrirTermos()')
     + '</div>'
     + '<button class="botao-perigo-fino" onclick="sair()">'+iconeInline('sair',16)+' Sair da conta</button>'
     + '</div>';
@@ -1799,6 +1887,36 @@ async function carregarModeracao(){
   MODERACAO = data.map(m => ({ id:m.id, nome:m.nome, cat:m.categoria_id, cidade:m.cidade, status:m.status }));
 }
 
+function baixarCSV(linhas, colunas, nomeArquivo){
+  const cabecalho = colunas.join(';');
+  const corpo = linhas.map(l => colunas.map(c => {
+    let v = l[c];
+    if(v == null) v = '';
+    v = String(v).replace(/"/g,'""');
+    if(v.indexOf(';') !== -1 || v.indexOf('"') !== -1 || v.indexOf('\n') !== -1) v = '"'+v+'"';
+    return v;
+  }).join(';')).join('\n');
+  const csv = cabecalho + '\n' + corpo;
+  const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nomeArquivo;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportarPrestadoresCSV(){
+  const { data, error } = await sb.from('prestadores').select('*');
+  if(error){ alert('Não foi possível exportar: ' + error.message); return; }
+  baixarCSV(data, ['id','nome','categoria_id','cidade','raio_km','nota','avaliacoes','servicos_concluidos','status','telefone','criado_em'], 'campofacil_prestadores.csv');
+}
+
+async function exportarPedidosCSV(){
+  const { data, error } = await sb.from('pedidos').select('*');
+  if(error){ alert('Não foi possível exportar: ' + error.message); return; }
+  baixarCSV(data, ['id','categoria_id','local','status','data_desejada','motivo_recusa','criado_em','prestador_id'], 'campofacil_pedidos.csv');
+}
+
 async function contarPrestadoresAprovados(){
   const { count, error } = await sb.from('prestadores').select('*', { count:'exact', head:true }).eq('status','aprovado');
   if(error){ console.error(error); return '—'; }
@@ -1836,7 +1954,10 @@ async function renderPainelAdmin(){
   const maxCont = Math.max(...CONTAGEM_CATEGORIAS.map(c=>c.n));
   document.getElementById('miolo-admin').innerHTML =
     '<div class="painel-cabecalho"><div><h1>Painel administrativo</h1><p>Visão para a UEM, cooperativas e prefeituras parceiras do CONECTA rural</p></div>'
-      + '<div class="marco">Prestadores, moderação e pedidos: dados reais · categorias e municípios ainda são demonstração</div></div>'
+      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">'
+        + '<div class="marco">Prestadores, moderação e pedidos: dados reais</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="botao botao-secundario" onclick="exportarPrestadoresCSV()">Exportar prestadores (CSV)</button><button class="botao botao-secundario" onclick="exportarPedidosCSV()">Exportar pedidos (CSV)</button></div>'
+      + '</div></div>'
     + '<div class="grade-estat">'
       + cartaoEstat('Prestadores cadastrados', String(totalAprovados), 'dado real')
       + cartaoEstat('Agricultores ativos', estatisticasPedidos.agricultoresAtivos, 'dado real')
