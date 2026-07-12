@@ -503,7 +503,8 @@ async function carregarDados(){
   // que entra numa fase futura. Por enquanto mostramos um traço no lugar do valor.
   PRESTADORES = preds.map(p => ({
     id:p.id, nome:p.nome, cat:p.categoria_id, cidade:p.cidade, raio:p.raio_km,
-    nota:Number(p.nota), avaliacoes:p.avaliacoes, verificado:true, dist:'—', telefone:p.telefone
+    nota:Number(p.nota), avaliacoes:p.avaliacoes, verificado:true, dist:'—', telefone:p.telefone,
+    fotoUrl:p.foto_url
   }));
   return true;
 }
@@ -580,6 +581,10 @@ async function atualizarLocalizacaoEDistancias(){
 let pedidoAtualId = null;
 
 function iniciais(nome){ return nome.split(' ').filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase(); }
+function avatarHTML(nome, fotoUrl){
+  if(fotoUrl) return '<img src="'+fotoUrl+'" class="avatar" style="object-fit:cover" alt="Foto de '+escaparHTML(nome)+'">';
+  return '<div class="avatar">'+iniciais(nome)+'</div>';
+}
 function catInfo(id){ return CATEGORIAS.find(c=>c.id===id); }
 function formatarData(iso){ if(!iso) return ''; const [ano,mes,dia] = iso.split('-'); return dia+'/'+mes+'/'+ano; }
 
@@ -679,13 +684,21 @@ const ABAS = [
 ];
 
 function renderNavegacao(){
+  const acao = a => a.id === 'tela-inicio' ? 'irParaInicio()' : "trocarAba('"+a.id+"')";
   document.getElementById('nav-lateral').innerHTML = ABAS.map(a=>
-    '<button data-aba="'+a.id+'" onclick="trocarAba(\''+a.id+'\')">'+iconeInline(a.ic,19)+'<span>'+a.rot+'</span></button>'
+    '<button data-aba="'+a.id+'" onclick="'+acao(a)+'">'+iconeInline(a.ic,19)+'<span>'+a.rot+'</span></button>'
   ).join('');
   document.getElementById('nav-inferior-mobile').innerHTML = ABAS.map(a=>
-    '<button data-aba="'+a.id+'" onclick="trocarAba(\''+a.id+'\')">'+iconeInline(a.ic,20)+'<span>'+a.rot+'</span></button>'
+    '<button data-aba="'+a.id+'" onclick="'+acao(a)+'">'+iconeInline(a.ic,20)+'<span>'+a.rot+'</span></button>'
   ).join('');
   document.getElementById('btn-admin-lateral').innerHTML = iconeInline('painel',17)+'<span>Painel administrativo</span>';
+}
+
+function irParaInicio(){
+  filtro = null;
+  raioFiltroKm = null;
+  trocarAba('tela-inicio');
+  renderBlocosInicio();
 }
 
 async function trocarAba(id){
@@ -793,7 +806,7 @@ function renderBlocosInicio(){
 function cartaoPrestadorHTML(p){
   const c = catInfo(p.cat);
   return '<button class="cartao-prestador" onclick="abrirPerfilPrestador('+p.id+')">'
-    + '<div class="avatar">'+iniciais(p.nome)+'</div>'
+    + avatarHTML(p.nome, p.fotoUrl)
     + '<div class="info-prestador">'
       + '<div class="linha1"><span class="nome">'+p.nome+'</span>'+(p.verificado?'<span class="selo-verificado">'+iconeInline('check',10)+'Verif.</span>':'')+'</div>'
       + '<div class="categoria-tag">'+c.rot+' · '+p.cidade+'</div>'
@@ -833,7 +846,7 @@ function renderModalPerfil(){
   const p = prestadorAtual, c = catInfo(p.cat);
   document.getElementById('conteudo-modal').innerHTML =
     '<div class="capa-perfil"><div class="conteudo">'
-      + '<div class="avatar">'+iniciais(p.nome)+'</div>'
+      + avatarHTML(p.nome, p.fotoUrl)
       + '<div><div class="nome">'+p.nome+'</div><div class="categoria-tag">'+c.rot+' · '+p.cidade+'</div>'
       + (p.verificado ? '<span class="selo-verificado" style="margin-top:8px">'+iconeInline('check',10)+'Verificado</span>' : '')
       + '</div></div></div>'
@@ -844,7 +857,6 @@ function renderModalPerfil(){
     + '<div class="cartao">'+c.rot+', a combinar conforme a necessidade da propriedade.</div>'
     + '<div class="rotulo-secao">Avaliações recentes</div>'
     + '<div id="lista-avaliacoes-prestador"><div class="legenda-muted">Carregando avaliações...</div></div>'
-    + '<div class="grade-acoes-contato"><button class="botao botao-secundario">'+iconeInline('telefone',18)+'Ligar</button><button class="botao botao-secundario">'+iconeInline('whats',18)+'WhatsApp</button></div>'
     + '<button class="botao botao-trigo" onclick="abrirSolicitacao()">Solicitar serviço</button>';
 }
 
@@ -1218,6 +1230,11 @@ function abrirEdicaoPrestador(){
   document.getElementById('conteudo-modal').innerHTML =
     '<div class="rotulo-secao" style="margin-top:0">Meu cadastro de prestador</div>'
     + '<div class="legenda-muted" style="margin-bottom:20px">Alterar categoria ou dados aqui não afeta suas avaliações já recebidas.</div>'
+    + '<div class="grupo-campo"><label>Foto de perfil</label>'
+      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">'+avatarHTML(c.nome, c.foto_url)+'</div>'
+      + '<input type="file" accept="image/*" onchange="enviarFotoPrestador(this)">'
+      + '<div id="mensagem-foto-prestador" class="legenda-muted" style="margin-top:6px"></div>'
+    + '</div>'
     + '<div class="grupo-campo"><label for="campo-prestador-nome">Seu nome ou nome da empresa</label><input id="campo-prestador-nome" type="text" value="'+c.nome+'"></div>'
     + '<div class="grupo-campo"><label for="campo-prestador-categoria">Categoria de serviço</label>'
       + '<select id="campo-prestador-categoria" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro);font-size:15px">'+opcoesCategorias+'</select></div>'
@@ -1228,6 +1245,43 @@ function abrirEdicaoPrestador(){
     + '<button class="botao botao-primario botao-bloco" onclick="salvarEdicaoPrestador()">Salvar alterações</button>'
     + '<button class="botao botao-secundario botao-bloco" style="margin-top:10px;color:var(--perigo);border-color:var(--perigo)" onclick="excluirCadastroPrestador()">Desativar meu cadastro de prestador</button>';
   abrirModal();
+}
+
+async function enviarFotoPrestador(inputEl){
+  const arquivo = inputEl.files[0];
+  if(!arquivo) return;
+  const msg = document.getElementById('mensagem-foto-prestador');
+  msg.textContent = 'Enviando...';
+  msg.style.color = 'var(--tinta-suave)';
+
+  const extensao = (arquivo.name.split('.').pop() || 'jpg').toLowerCase();
+  const caminho = usuarioAtual.id + '/foto-' + Date.now() + '.' + extensao;
+
+  const { error: erroUpload } = await sb.storage.from('fotos-prestadores').upload(caminho, arquivo, { upsert:true });
+  if(erroUpload){
+    msg.textContent = 'Não foi possível enviar a foto: ' + erroUpload.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from('fotos-prestadores').getPublicUrl(caminho);
+  const { data, error } = await sb.from('prestadores')
+    .update({ foto_url: urlData.publicUrl })
+    .eq('id', meuCadastroPrestador.id)
+    .select()
+    .maybeSingle();
+
+  if(error){
+    msg.textContent = 'Não foi possível salvar a foto: ' + error.message;
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+
+  meuCadastroPrestador = data;
+  msg.textContent = 'Foto atualizada!';
+  msg.style.color = 'var(--tinta)';
+  const p = PRESTADORES.find(pr=>pr.id===data.id);
+  if(p) p.fotoUrl = data.foto_url;
 }
 
 async function salvarEdicaoPrestador(){
@@ -1344,7 +1398,7 @@ function renderPerfilConta(){
     + '<div class="cartao-conta"><div class="avatar">'+iniciais(nome)+'</div><div><div class="nome">'+nome+'</div><div class="local">'+email+'</div></div></div>'
     + blocoStatusPrestador()
     + '<div class="cartao" style="padding:4px 16px">'
-      + linhaMenu('telefone','Meu telefone e contato','abrirEdicaoContato()')
+      + linhaMenu('telefone','Meus dados (nome e telefone)','abrirEdicaoContato()')
       + linhaMenu('pino','Minha propriedade e localização','abrirEdicaoPropriedade()')
       + linhaMenu('ajuda','Central de ajuda','abrirCentralAjuda()')
     + '</div>'
@@ -1357,23 +1411,25 @@ function linhaMenu(iconeNome, texto, onclick){
 
 /* ======================= MEU TELEFONE E CONTATO ======================= */
 function abrirEdicaoContato(){
-  const telefoneAtual = (usuarioAtual.user_metadata && usuarioAtual.user_metadata.telefone) || '';
+  const meta = usuarioAtual.user_metadata || {};
   document.getElementById('conteudo-modal').innerHTML =
-    '<div class="rotulo-secao" style="margin-top:0">Meu telefone e contato</div>'
-    + '<div class="legenda-muted" style="margin-bottom:20px">Usado para preencher seus pedidos automaticamente e para prestadores combinarem detalhes com você.</div>'
-    + '<div class="grupo-campo"><label for="campo-meu-telefone">Telefone</label><input id="campo-meu-telefone" type="text" value="'+telefoneAtual+'" placeholder="(55) 9 9999-9999"></div>'
+    '<div class="rotulo-secao" style="margin-top:0">Meus dados</div>'
+    + '<div class="legenda-muted" style="margin-bottom:20px">Seu nome aparece na saudação do app. O telefone é usado para preencher seus pedidos automaticamente e para prestadores combinarem detalhes com você.</div>'
+    + '<div class="grupo-campo"><label for="campo-meu-nome">Nome</label><input id="campo-meu-nome" type="text" value="'+(meta.nome||'')+'"></div>'
+    + '<div class="grupo-campo"><label for="campo-meu-telefone">Telefone</label><input id="campo-meu-telefone" type="text" value="'+(meta.telefone||'')+'" placeholder="(55) 9 9999-9999"></div>'
     + '<div id="mensagem-contato" class="legenda-muted" style="min-height:18px"></div>'
     + '<button class="botao botao-primario botao-bloco" onclick="salvarContato()">Salvar</button>';
   abrirModal();
 }
 
 async function salvarContato(){
+  const nome = document.getElementById('campo-meu-nome').value.trim();
   const telefone = document.getElementById('campo-meu-telefone').value.trim();
   const msg = document.getElementById('mensagem-contato');
   msg.textContent = 'Salvando...';
   msg.style.color = 'var(--tinta-suave)';
   const { data, error } = await sb.auth.updateUser({
-    data: { ...(usuarioAtual.user_metadata||{}), telefone }
+    data: { ...(usuarioAtual.user_metadata||{}), nome, telefone }
   });
   if(error){
     msg.textContent = 'Não foi possível salvar: ' + error.message;
@@ -1382,6 +1438,8 @@ async function salvarContato(){
   }
   usuarioAtual = data.user;
   fecharModal();
+  renderInicio();
+  renderPerfilConta();
 }
 
 /* ======================= MINHA PROPRIEDADE E LOCALIZAÇÃO ======================= */
