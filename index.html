@@ -200,6 +200,10 @@
   .grupo-campo input, .grupo-campo textarea{ width:100%; border:1.5px solid var(--zinco-claro); border-radius: var(--raio-sm); padding:12px 13px; background: var(--branco); color: var(--tinta); }
   .grupo-campo input:focus, .grupo-campo textarea:focus{ border-color: var(--verde); outline:none; }
   .grupo-campo textarea{ resize:vertical; min-height:74px; }
+  .grade-servicos-extras{ display:grid; grid-template-columns:1fr 1fr; gap:2px 16px; }
+  @media (max-width:420px){ .grade-servicos-extras{ grid-template-columns:1fr; } }
+  .item-servico-extra{ display:flex !important; align-items:center; gap:8px; padding:7px 0; text-transform:none !important; font-size:14px !important; font-weight:600; letter-spacing:normal !important; color:var(--tinta); cursor:pointer; }
+  .item-servico-extra input{ width:auto !important; flex-shrink:0; margin:0; }
 
   .capa-perfil{ background: linear-gradient(135deg, var(--verde) 0%, var(--verde-escuro) 100%); border-radius: var(--raio-lg); padding:22px 20px; color: var(--lona); margin-bottom:18px; position:relative; overflow:hidden; }
   .capa-perfil::after{ content:""; position:absolute; inset:0; background-image: repeating-linear-gradient(120deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 22px); }
@@ -912,9 +916,20 @@ function abrirSolicitacao(){
   const meta = usuarioAtual.user_metadata || {};
   const temPropriedadeSalva = meta.propriedadeLat != null && meta.propriedadeLon != null;
   localizacaoCapturada = temPropriedadeSalva ? { lat: meta.propriedadeLat, lon: meta.propriedadeLon } : null;
+
+  const categoriasDoPrestador = [p.cat, ...p.catsExtras];
+  const categoriaPreSelecionada = (filtro && filtro.tipo === 'categoria' && categoriasDoPrestador.includes(filtro.id)) ? filtro.id : p.cat;
+  const seletorServico = categoriasDoPrestador.length > 1
+    ? '<div class="grupo-campo"><label for="campo-servico-pedido">Qual serviço você precisa?</label>'
+      + '<select id="campo-servico-pedido" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro);font-size:15px">'
+        + categoriasDoPrestador.map(id=>'<option value="'+id+'" '+(id===categoriaPreSelecionada?'selected':'')+'>'+catInfo(id).rot+'</option>').join('')
+      + '</select></div>'
+    : '<input type="hidden" id="campo-servico-pedido" value="'+p.cat+'">';
+
   document.getElementById('conteudo-modal').innerHTML =
     '<div class="rotulo-secao" style="margin-top:0">Solicitar serviço</div>'
-    + '<div class="legenda-muted" style="margin-bottom:20px">Prestador: <strong style="color:var(--tinta)">'+p.nome+'</strong> · '+catInfo(p.cat).rot+'</div>'
+    + '<div class="legenda-muted" style="margin-bottom:20px">Prestador: <strong style="color:var(--tinta)">'+p.nome+'</strong></div>'
+    + seletorServico
     + '<div class="grupo-campo"><label for="campo-local">Local do serviço</label><input id="campo-local" type="text" placeholder="Ex.: Linha São José, propriedade km 4" value="'+(meta.propriedadeLocal || 'Minha propriedade')+'"></div>'
     + '<div class="grupo-campo"><label for="campo-tel-agricultor">Seu telefone (para o prestador combinar detalhes)</label><input id="campo-tel-agricultor" type="text" value="'+(meta.telefone || '')+'" placeholder="(55) 9 9999-9999"></div>'
     + '<div class="grupo-campo"><label>Localização exata (opcional, recomendado para propriedades rurais)</label>'
@@ -983,9 +998,10 @@ async function enviarPedido(){
   const telAgricultor = document.getElementById('campo-tel-agricultor').value.trim();
   const data = document.getElementById('campo-data').value;
   const obs = document.getElementById('campo-obs').value;
+  const categoriaEscolhida = document.getElementById('campo-servico-pedido').value;
 
   const { data: novo, error } = await sb.from('pedidos').insert({
-    prestador_id: prestadorAtual.id, categoria_id: prestadorAtual.cat,
+    prestador_id: prestadorAtual.id, categoria_id: categoriaEscolhida,
     local, data_desejada: data || null, observacoes: obs,
     status: 'solicitado', agricultor_user_id: usuarioAtual.id,
     latitude: localizacaoCapturada ? localizacaoCapturada.lat : null,
@@ -1310,11 +1326,11 @@ async function abrirEdicaoPrestador(){
   const idsExtras = new Set((extras||[]).map(e=>e.categoria_id));
   const lista = document.getElementById('lista-servicos-extras');
   if(lista){
-    lista.innerHTML = CATEGORIAS.filter(cat=>cat.id !== c.categoria_id).map(cat=>
-      '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-weight:600;color:var(--tinta)">'
-        + '<input type="checkbox" class="chk-servico-extra" value="'+cat.id+'" '+(idsExtras.has(cat.id)?'checked':'')+'> '+cat.rot
+    lista.innerHTML = '<div class="grade-servicos-extras">' + CATEGORIAS.filter(cat=>cat.id !== c.categoria_id).map(cat=>
+      '<label class="item-servico-extra">'
+        + '<input type="checkbox" class="chk-servico-extra" value="'+cat.id+'" '+(idsExtras.has(cat.id)?'checked':'')+'><span>'+cat.rot+'</span>'
       + '</label>'
-    ).join('');
+    ).join('') + '</div>';
   }
 }
 
