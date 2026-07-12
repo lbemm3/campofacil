@@ -504,7 +504,7 @@ async function carregarDados(){
   PRESTADORES = preds.map(p => ({
     id:p.id, nome:p.nome, cat:p.categoria_id, cidade:p.cidade, raio:p.raio_km,
     nota:Number(p.nota), avaliacoes:p.avaliacoes, verificado:true, dist:'—', telefone:p.telefone,
-    fotoUrl:p.foto_url
+    fotoUrl:p.foto_url, servicosConcluidos:p.servicos_concluidos||0
   }));
   return true;
 }
@@ -761,13 +761,17 @@ function renderBlocosInicio(){
 
   if(!filtro){
     const maisUsadas = MAIS_USADAS.map(id=>CATEGORIAS.find(c=>c.id===id));
-    let html = blocoGrupoWeb('Mais usadas', maisUsadas);
+    let html = (agricultorCoords ? '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'+seletorRaioHTML()+'</div>' : '') + blocoGrupoWeb('Mais usadas', maisUsadas);
     GRUPOS.forEach(g=>{
       const itens = CATEGORIAS.filter(c=>c.grupo===g.id);
       if(itens.length) html += blocoGrupoWeb(g.rot, itens);
     });
     blocoCat.innerHTML = html;
-    const destaque = PRESTADORES.filter(p=>p.verificado).sort((a,b)=>b.nota-a.nota).slice(0,4);
+    let destaque = PRESTADORES.filter(p=>p.verificado);
+    if(raioFiltroKm !== null && agricultorCoords){
+      destaque = destaque.filter(p => { const d = distanciaKm(p); return d !== null && d <= raioFiltroKm; });
+    }
+    destaque = destaque.sort((a,b)=>b.nota-a.nota).slice(0,4);
     blocoRes.innerHTML =
       '<div class="rotulo-secao">Prestadores em destaque</div>'
       + '<div class="grade-prestadores">' + destaque.map(cartaoPrestadorHTML).join('') + '</div>';
@@ -851,6 +855,8 @@ function renderModalPerfil(){
       + (p.verificado ? '<span class="selo-verificado" style="margin-top:8px">'+iconeInline('check',10)+'Verificado</span>' : '')
       + '</div></div></div>'
     + '<div class="cartao"><div class="meta" style="margin-top:0"><span class="item estrela">'+iconeInline('estrela',14)+' '+p.nota.toFixed(1)+' de nota ('+p.avaliacoes+' avaliações)</span></div>'
+      + '<div class="linha-tracejada"></div>'
+      + '<div class="meta"><span class="item">'+iconeInline('check',14)+' '+p.servicosConcluidos+' serviço'+(p.servicosConcluidos===1?'':'s')+' concluído'+(p.servicosConcluidos===1?'':'s')+'</span></div>'
       + '<div class="linha-tracejada"></div>'
       + '<div class="meta"><span class="item">'+iconeInline('pino',14)+' Atende num raio de '+p.raio+' km a partir de '+p.cidade+'</span></div></div>'
     + '<div class="rotulo-secao">Serviços oferecidos</div>'
@@ -952,7 +958,8 @@ async function carregarPedidos(){
     id:p.id, prestadorId:p.prestador_id, cat:p.categoria_id, local:p.local,
     data:p.data_desejada, obs:p.observacoes, status:p.status,
     criadoEm:p.criado_em, agricultorUserId:p.agricultor_user_id,
-    latitude:p.latitude, longitude:p.longitude, agricultorTelefone:p.agricultor_telefone
+    latitude:p.latitude, longitude:p.longitude, agricultorTelefone:p.agricultor_telefone,
+    motivoRecusa:p.motivo_recusa
   }));
   await carregarAvaliacoesFeitas();
 }
@@ -1012,9 +1019,48 @@ async function avancarStatus(){
   if(await atualizarStatusServidor(pedido, proximaEtapa(pedido.status))) renderModalAcompanhar();
 }
 
+const MOTIVOS_RECUSA = [
+  'Agenda cheia no momento',
+  'Fora da minha área de atendimento',
+  'Não atendo esse tipo de serviço',
+  'Preço não é viável',
+];
+
+function abrirRecusaPedido(){
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Por que você quer recusar?</div>'
+    + '<div class="legenda-muted" style="margin-bottom:16px">Isso ajuda o agricultor a entender e buscar outra opção mais rápido.</div>'
+    + '<div id="opcoes-motivo-recusa">'
+      + MOTIVOS_RECUSA.map(m=>'<button type="button" class="botao botao-secundario botao-bloco" style="margin-bottom:8px;text-align:left" onclick="confirmarRecusa(\''+escaparHTML(m)+'\')">'+m+'</button>').join('')
+      + '<button type="button" class="botao botao-secundario botao-bloco" style="margin-bottom:8px;text-align:left" onclick="mostrarCampoOutroMotivo()">Outro motivo</button>'
+    + '</div>'
+    + '<div id="campo-outro-motivo-container" class="oculto">'
+      + '<div class="grupo-campo"><label for="campo-outro-motivo">Descreva o motivo</label><textarea id="campo-outro-motivo" placeholder="Explique rapidamente por que não pode atender"></textarea></div>'
+      + '<button class="botao botao-trigo botao-bloco" onclick="confirmarRecusaComTexto()">Confirmar recusa</button>'
+    + '</div>';
+}
+
+function mostrarCampoOutroMotivo(){
+  document.getElementById('opcoes-motivo-recusa').classList.add('oculto');
+  document.getElementById('campo-outro-motivo-container').classList.remove('oculto');
+}
+
+async function confirmarRecusaComTexto(){
+  const texto = document.getElementById('campo-outro-motivo').value.trim();
+  await confirmarRecusa(texto || 'Não informado');
+}
+
+async function confirmarRecusa(motivo){
+  const pedido = pedidoPorId(pedidoAtualId);
+  const { error } = await sb.from('pedidos').update({ status:'recusado', motivo_recusa: motivo }).eq('id', pedido.id);
+  if(error){ alert('Não foi possível recusar o pedido: ' + error.message); return; }
+  pedido.status = 'recusado';
+  pedido.motivoRecusa = motivo;
+  renderModalAcompanhar();
+}
+
 async function decidirPedido(novoStatus){
   const pedido = pedidoPorId(pedidoAtualId);
-  if(novoStatus === 'recusado' && !confirm('Tem certeza que deseja recusar este pedido?')) return;
   if(await atualizarStatusServidor(pedido, novoStatus)) renderModalAcompanhar();
 }
 
@@ -1051,7 +1097,10 @@ function renderModalAcompanhar(){
   let corpoEtapas, botaoAcao;
 
   if(statusNegativo){
-    corpoEtapas = '<div class="cartao" style="text-align:center"><div style="font-weight:800;color:'+statusNegativo.cor+'">'+statusNegativo.rot+'</div><div class="legenda-muted" style="margin-top:4px">'+statusNegativo.msg+'</div></div>';
+    const mensagemNegativa = (pedido.status === 'recusado' && pedido.motivoRecusa)
+      ? 'Motivo informado pelo prestador: "'+escaparHTML(pedido.motivoRecusa)+'"'
+      : statusNegativo.msg;
+    corpoEtapas = '<div class="cartao" style="text-align:center"><div style="font-weight:800;color:'+statusNegativo.cor+'">'+statusNegativo.rot+'</div><div class="legenda-muted" style="margin-top:4px">'+mensagemNegativa+'</div></div>';
     botaoAcao = '';
   } else {
     const idxAtual = ETAPAS_PEDIDO.findIndex(e=>e.id===pedido.status);
@@ -1076,7 +1125,7 @@ function renderModalAcompanhar(){
         botaoAcao = botaoCombinar
           + '<div style="display:flex;gap:10px">'
             + '<button class="botao botao-trigo" style="flex:1" onclick="decidirPedido(\'aceito\')">Aceitar</button>'
-            + '<button class="botao botao-secundario" style="flex:1;color:var(--perigo);border-color:var(--perigo)" onclick="decidirPedido(\'recusado\')">Recusar</button>'
+            + '<button class="botao botao-secundario" style="flex:1;color:var(--perigo);border-color:var(--perigo)" onclick="abrirRecusaPedido()">Recusar</button>'
           + '</div>';
       } else {
         botaoAcao = botaoCombinar + '<button class="botao botao-trigo botao-bloco" onclick="avancarStatus()">Avançar etapa</button>';
