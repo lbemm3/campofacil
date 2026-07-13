@@ -348,6 +348,7 @@
     <button class="botao botao-secundario botao-bloco" style="margin-top:10px" onclick="criarContaComEmail()">Criar conta nova</button>
     <button class="botao-perigo-fino" style="margin-top:14px;color:var(--tinta-suave)" onclick="abrirRecuperarSenha()">Esqueci minha senha</button>
     <button class="botao-perigo-fino" style="margin-top:4px;color:var(--tinta-suave);font-size:12px" onclick="abrirTermos()">Termos de uso e Privacidade</button>
+    <button class="botao-perigo-fino" style="margin-top:2px;color:var(--tinta-suave);font-size:12px" onclick="abrirSobre()">Sobre o CampoFácil</button>
   </div>
 </div>
 
@@ -436,6 +437,22 @@ const TERMOS_TEXTO_HTML =
 
 function conteudoTermosHTML(){
   return '<div class="rotulo-secao" style="margin-top:0">Termos de Uso e Privacidade</div>' + TERMOS_TEXTO_HTML;
+}
+
+const SOBRE_TEXTO_HTML =
+  '<div class="cartao" style="margin-bottom:10px"><div class="legenda-muted">O CampoFácil é um projeto ligado ao <strong>CONECTA Rural</strong>, iniciativa que conecta a UEM (Universidade Estadual de Maringá), cooperativas e prefeituras do noroeste do Rio Grande do Sul, na região de Ijuí, Panambi e Santa Rosa.</div></div>'
+  + '<div class="cartao" style="margin-bottom:10px"><div class="legenda-muted">O objetivo é facilitar o contato entre agricultores e prestadores de serviço rural — trator, frete, retroescavadeira, veterinário e muitos outros — numa região onde encontrar quem presta esse tipo de serviço nem sempre é fácil.</div></div>'
+  + '<div class="cartao"><div class="legenda-muted">O app está em desenvolvimento contínuo, evoluindo a partir do uso real de agricultores e prestadores da região.</div></div>';
+
+function abrirSobre(){
+  const dentroDoApp = !document.getElementById('aplicativo').classList.contains('oculto');
+  const conteudo = '<div class="rotulo-secao" style="margin-top:0">Sobre o CampoFácil</div>' + SOBRE_TEXTO_HTML;
+  if(dentroDoApp){
+    document.getElementById('conteudo-modal').innerHTML = conteudo + '<button class="botao botao-primario botao-bloco" style="margin-top:8px" onclick="fecharModal()">Fechar</button>';
+    abrirModal();
+  } else {
+    document.querySelector('#pagina-login .cartao-login').innerHTML = conteudo + '<button class="botao botao-primario botao-bloco" style="margin-top:8px" onclick="location.reload()">Voltar para o login</button>';
+  }
 }
 
 function abrirTermos(){
@@ -543,7 +560,8 @@ async function carregarDados(){
   PRESTADORES = preds.map(p => ({
     id:p.id, nome:p.nome, cat:p.categoria_id, cidade:p.cidade, raio:p.raio_km,
     nota:Number(p.nota), avaliacoes:p.avaliacoes, verificado:true, dist:'—', telefone:p.telefone,
-    fotoUrl:p.foto_url, servicosConcluidos:p.servicos_concluidos||0, catsExtras:[]
+    fotoUrl:p.foto_url, servicosConcluidos:p.servicos_concluidos||0, catsExtras:[],
+    precoMin:p.preco_min, precoMax:p.preco_max
   }));
 
   const { data: extras, error: errExtras } = await sb.from('prestador_categorias').select('prestador_id, categoria_id');
@@ -864,6 +882,8 @@ function blocoGrupoWeb(titulo, categorias){
 
 let raioFiltroKm = null;
 
+function normalizarBusca(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function telefoneValido(t){ return !t || t.replace(/\D/g,'').length >= 10; }
 function distanciaKm(p){
   if(!p.dist || p.dist === '—') return null;
   const n = parseInt(p.dist, 10);
@@ -913,8 +933,8 @@ function renderBlocosInicio(){
     lista = PRESTADORES.filter(p=>p.cat===filtro.id || p.catsExtras.includes(filtro.id));
     titulo = catInfo(filtro.id).rot;
   } else {
-    const termo = filtro.termo;
-    lista = PRESTADORES.filter(p => p.nome.toLowerCase().includes(termo) || catInfo(p.cat).rot.toLowerCase().includes(termo) || p.cidade.toLowerCase().includes(termo));
+    const termo = normalizarBusca(filtro.termo);
+    lista = PRESTADORES.filter(p => normalizarBusca(p.nome).includes(termo) || normalizarBusca(catInfo(p.cat).rot).includes(termo) || normalizarBusca(p.cidade).includes(termo));
     titulo = 'Resultados para "'+filtro.termo+'"';
   }
 
@@ -976,6 +996,28 @@ function abrirPerfilPrestador(id){
   carregarComentariosPrestador(id);
 }
 
+function abrirDenuncia(tipo, id){
+  document.getElementById('conteudo-modal').innerHTML =
+    '<div class="rotulo-secao" style="margin-top:0">Denunciar</div>'
+    + '<div class="legenda-muted" style="margin-bottom:16px">Conte o que aconteceu — o administrador vai revisar.</div>'
+    + '<div class="grupo-campo"><textarea id="campo-motivo-denuncia" placeholder="Descreva o motivo"></textarea></div>'
+    + '<div id="mensagem-denuncia" class="legenda-muted" style="min-height:18px"></div>'
+    + '<button class="botao botao-primario botao-bloco" onclick="enviarDenuncia(\''+tipo+'\','+id+')">Enviar denúncia</button>';
+  abrirModal();
+}
+
+async function enviarDenuncia(tipo, id){
+  const motivo = document.getElementById('campo-motivo-denuncia').value.trim();
+  const msg = document.getElementById('mensagem-denuncia');
+  if(!motivo){ msg.textContent = 'Descreva o motivo.'; msg.style.color = 'var(--perigo)'; return; }
+  msg.textContent = 'Enviando...'; msg.style.color = 'var(--tinta-suave)';
+  const registro = { tipo, autor_user_id: usuarioAtual.id, motivo };
+  if(tipo === 'prestador') registro.prestador_id = id; else registro.pedido_id = id;
+  const { error } = await sb.from('denuncias').insert(registro);
+  if(error){ msg.textContent = 'Não foi possível enviar: ' + error.message; msg.style.color = 'var(--perigo)'; return; }
+  msg.textContent = 'Denúncia enviada. Obrigado.'; msg.style.color = 'var(--tinta)';
+}
+
 function compartilharPerfil(){
   const link = window.location.origin + window.location.pathname + '?prestador=' + prestadorAtual.id;
   const msg = 'Confira ' + prestadorAtual.nome + ' (' + catInfo(prestadorAtual.cat).rot + ') no CampoFácil: ' + link;
@@ -993,12 +1035,15 @@ function renderModalPerfil(){
       + '<div class="linha-tracejada"></div>'
       + '<div class="meta"><span class="item">'+iconeInline('check',14)+' '+p.servicosConcluidos+' serviço'+(p.servicosConcluidos===1?'':'s')+' concluído'+(p.servicosConcluidos===1?'':'s')+'</span></div>'
       + '<div class="linha-tracejada"></div>'
-      + '<div class="meta"><span class="item">'+iconeInline('pino',14)+' Atende num raio de '+p.raio+' km a partir de '+p.cidade+'</span></div></div>'
+      + '<div class="meta"><span class="item">'+iconeInline('pino',14)+' Atende num raio de '+p.raio+' km a partir de '+p.cidade+'</span></div>'
+      + (p.precoMin || p.precoMax ? '<div class="linha-tracejada"></div><div class="meta"><span class="item">Faixa de preço de referência: R$ '+(p.precoMin||'?')+' – R$ '+(p.precoMax||'?')+'</span></div>' : '')
+    + '</div>'
     + '<div class="rotulo-secao">Serviços oferecidos</div>'
     + '<div class="cartao">' + [c.rot].concat(p.catsExtras.map(id=>catInfo(id).rot)).join(' · ') + ', a combinar conforme a necessidade da propriedade.</div>'
     + '<div class="rotulo-secao">Avaliações recentes</div>'
     + '<div id="lista-avaliacoes-prestador"><div class="legenda-muted">Carregando avaliações...</div></div>'
     + '<button class="botao botao-secundario botao-bloco" onclick="compartilharPerfil()">'+iconeInline('whats',18)+' Compartilhar perfil</button>'
+    + '<button class="botao-perigo-fino" style="margin-bottom:10px" onclick="abrirDenuncia(\'prestador\','+p.id+')">Denunciar este prestador</button>'
     + '<button class="botao botao-trigo" onclick="abrirSolicitacao()">Solicitar serviço</button>';
 }
 
@@ -1338,7 +1383,8 @@ function renderModalAcompanhar(){
       botaoAcao = botaoZapPrestador + (podeCancelar
         ? '<button class="botao botao-secundario botao-bloco" style="margin-bottom:10px" onclick="abrirEdicaoPedido()">Editar pedido</button>'
           + '<button class="botao botao-secundario botao-bloco" style="color:var(--perigo);border-color:var(--perigo)" onclick="cancelarPedido()">Cancelar pedido</button>'
-        : '<div class="legenda-muted" style="text-align:center;margin-top:6px">O prestador já aceitou o pedido — para desmarcar, combine diretamente com ele.</div>');
+        : '<div class="legenda-muted" style="text-align:center;margin-top:6px">O prestador já aceitou o pedido — para desmarcar, combine diretamente com ele.</div>')
+        + '<button class="botao-perigo-fino" style="margin-top:10px" onclick="abrirDenuncia(\'pedido\','+pedido.id+')">Denunciar este pedido</button>';
     } else {
       botaoAcao = '<div class="legenda-muted" style="text-align:center;margin-top:6px">Aguardando o prestador atualizar o status.</div>';
     }
@@ -1439,6 +1485,10 @@ function abrirCadastroPrestador(){
     + '<div class="grupo-campo"><label for="campo-prestador-cidade">Cidade</label><input id="campo-prestador-cidade" type="text" placeholder="Ex.: Ijuí"></div>'
     + '<div class="grupo-campo"><label for="campo-prestador-raio">Raio de atendimento (km)</label><input id="campo-prestador-raio" type="number" value="30" min="5" max="200"></div>'
     + '<div class="grupo-campo"><label for="campo-prestador-telefone">Telefone de contato</label><input id="campo-prestador-telefone" type="text" placeholder="(55) 9 9999-9999"></div>'
+    + '<div class="grupo-campo"><label>Faixa de preço de referência (opcional)</label><div style="display:flex;gap:8px">'
+      + '<input id="campo-preco-min" type="number" placeholder="Mín. R$" style="width:50%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro)">'
+      + '<input id="campo-preco-max" type="number" placeholder="Máx. R$" style="width:50%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro)">'
+    + '</div></div>'
     + '<div id="mensagem-cadastro-prestador" class="legenda-muted" style="min-height:18px"></div>'
     + '<button class="botao botao-primario botao-bloco" onclick="enviarCadastroPrestador()">Enviar cadastro</button>';
   abrirModal();
@@ -1450,10 +1500,17 @@ async function enviarCadastroPrestador(){
   const cidade = document.getElementById('campo-prestador-cidade').value.trim();
   const raio_km = Number(document.getElementById('campo-prestador-raio').value) || 30;
   const telefone = document.getElementById('campo-prestador-telefone').value.trim();
+  const preco_min = document.getElementById('campo-preco-min').value ? Number(document.getElementById('campo-preco-min').value) : null;
+  const preco_max = document.getElementById('campo-preco-max').value ? Number(document.getElementById('campo-preco-max').value) : null;
   const msg = document.getElementById('mensagem-cadastro-prestador');
 
   if(!nome || !cidade){
     msg.textContent = 'Preencha ao menos o nome e a cidade.';
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
+  if(!telefoneValido(telefone)){
+    msg.textContent = 'Telefone parece incompleto — inclua DDD (ex: 55 99999-9999).';
     msg.style.color = 'var(--perigo)';
     return;
   }
@@ -1462,7 +1519,7 @@ async function enviarCadastroPrestador(){
   msg.style.color = 'var(--tinta-suave)';
 
   const { data, error } = await sb.from('prestadores').insert({
-    nome, categoria_id, cidade, raio_km, telefone,
+    nome, categoria_id, cidade, raio_km, telefone, preco_min, preco_max,
     user_id: usuarioAtual.id, status: 'pendente'
   }).select().maybeSingle();
 
@@ -1497,6 +1554,10 @@ async function abrirEdicaoPrestador(){
     + '<div class="grupo-campo"><label for="campo-prestador-cidade">Cidade</label><input id="campo-prestador-cidade" type="text" value="'+c.cidade+'"></div>'
     + '<div class="grupo-campo"><label for="campo-prestador-raio">Raio de atendimento (km)</label><input id="campo-prestador-raio" type="number" value="'+c.raio_km+'" min="5" max="200"></div>'
     + '<div class="grupo-campo"><label for="campo-prestador-telefone">Telefone de contato</label><input id="campo-prestador-telefone" type="text" value="'+(c.telefone||'')+'" placeholder="(55) 9 9999-9999"></div>'
+    + '<div class="grupo-campo"><label>Faixa de preço de referência (opcional)</label><div style="display:flex;gap:8px">'
+      + '<input id="campo-preco-min" type="number" placeholder="Mín. R$" value="'+(c.preco_min||'')+'" style="width:50%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro)">'
+      + '<input id="campo-preco-max" type="number" placeholder="Máx. R$" value="'+(c.preco_max||'')+'" style="width:50%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--zinco-claro)">'
+    + '</div></div>'
     + '<div id="mensagem-cadastro-prestador" class="legenda-muted" style="min-height:18px"></div>'
     + '<button class="botao botao-primario botao-bloco" onclick="salvarEdicaoPrestador()">Salvar alterações</button>'
     + '<button class="botao botao-secundario botao-bloco" style="margin-top:10px;color:var(--perigo);border-color:var(--perigo)" onclick="excluirCadastroPrestador()">Desativar meu cadastro de prestador</button>';
@@ -1557,6 +1618,8 @@ async function salvarEdicaoPrestador(){
   const cidade = document.getElementById('campo-prestador-cidade').value.trim();
   const raio_km = Number(document.getElementById('campo-prestador-raio').value) || 30;
   const telefone = document.getElementById('campo-prestador-telefone').value.trim();
+  const preco_min = document.getElementById('campo-preco-min').value ? Number(document.getElementById('campo-preco-min').value) : null;
+  const preco_max = document.getElementById('campo-preco-max').value ? Number(document.getElementById('campo-preco-max').value) : null;
   const extrasSelecionados = Array.from(document.querySelectorAll('.chk-servico-extra:checked')).map(el=>el.value);
   const msg = document.getElementById('mensagem-cadastro-prestador');
 
@@ -1565,12 +1628,17 @@ async function salvarEdicaoPrestador(){
     msg.style.color = 'var(--perigo)';
     return;
   }
+  if(!telefoneValido(telefone)){
+    msg.textContent = 'Telefone parece incompleto — inclua DDD (ex: 55 99999-9999).';
+    msg.style.color = 'var(--perigo)';
+    return;
+  }
 
   msg.textContent = 'Salvando...';
   msg.style.color = 'var(--tinta-suave)';
 
   const { data, error } = await sb.from('prestadores')
-    .update({ nome, categoria_id, cidade, raio_km, telefone })
+    .update({ nome, categoria_id, cidade, raio_km, telefone, preco_min, preco_max })
     .eq('id', meuCadastroPrestador.id)
     .select()
     .maybeSingle();
@@ -1733,6 +1801,7 @@ function renderPerfilConta(){
       + linhaMenu('pino','Minha propriedade e localização','abrirEdicaoPropriedade()')
       + linhaMenu('ajuda','Central de ajuda','abrirCentralAjuda()')
       + linhaMenu('clip','Termos de uso e Privacidade','abrirTermos()')
+      + linhaMenu('logo','Sobre o CampoFácil','abrirSobre()')
     + '</div>'
     + '<button class="botao-perigo-fino" onclick="sair()">'+iconeInline('sair',16)+' Sair da conta</button>'
     + '</div>';
@@ -1924,8 +1993,8 @@ async function contarPrestadoresAprovados(){
 }
 
 async function calcularEstatisticasPedidos(){
-  const { data, error } = await sb.from('pedidos').select('agricultor_user_id, status, criado_em');
-  if(error){ console.error('Erro ao calcular estatísticas de pedidos:', error); return { agricultoresAtivos:'—', pedidosMes:'—', taxaAceitacao:'—' }; }
+  const { data, error } = await sb.from('pedidos').select('agricultor_user_id, status, criado_em, categoria_id, prestador_id');
+  if(error){ console.error('Erro ao calcular estatísticas de pedidos:', error); return { agricultoresAtivos:'—', pedidosMes:'—', taxaAceitacao:'—', categoriasReais:[], municipiosReais:[] }; }
 
   const agricultoresUnicos = new Set(data.map(p=>p.agricultor_user_id).filter(Boolean));
 
@@ -1938,11 +2007,21 @@ async function calcularEstatisticasPedidos(){
   const decididos = aceitos + recusados;
   const taxaAceitacao = decididos > 0 ? Math.round((aceitos/decididos)*100) + '%' : '—';
 
-  return {
-    agricultoresAtivos: String(agricultoresUnicos.size),
-    pedidosMes: String(pedidosMes),
-    taxaAceitacao
-  };
+  const contagemCat = {};
+  data.forEach(p => { contagemCat[p.categoria_id] = (contagemCat[p.categoria_id]||0) + 1; });
+  const categoriasReais = Object.entries(contagemCat).map(([id,n])=>({id,n})).sort((a,b)=>b.n-a.n).slice(0,8);
+
+  const contagemPedidosPorPrestador = {};
+  data.forEach(p => { if(p.prestador_id) contagemPedidosPorPrestador[p.prestador_id] = (contagemPedidosPorPrestador[p.prestador_id]||0) + 1; });
+  const contagemMunicipio = {};
+  PRESTADORES.forEach(p => {
+    if(!contagemMunicipio[p.cidade]) contagemMunicipio[p.cidade] = { prestadores:0, pedidos:0 };
+    contagemMunicipio[p.cidade].prestadores++;
+    contagemMunicipio[p.cidade].pedidos += contagemPedidosPorPrestador[p.id] || 0;
+  });
+  const municipiosReais = Object.entries(contagemMunicipio).map(([nome,v])=>({ nome, prestadores:v.prestadores, pedidos:v.pedidos })).sort((a,b)=>b.prestadores-a.prestadores);
+
+  return { agricultoresAtivos: String(agricultoresUnicos.size), pedidosMes: String(pedidosMes), taxaAceitacao, categoriasReais, municipiosReais };
 }
 
 async function abrirAdmin(){ document.getElementById('pagina-admin').classList.add('ativo'); await renderPainelAdmin(); }
@@ -1950,8 +2029,7 @@ function voltarApp(){ document.getElementById('pagina-admin').classList.remove('
 
 async function renderPainelAdmin(){
   document.getElementById('miolo-admin').innerHTML = '<div class="legenda-muted" style="padding:24px">Carregando painel...</div>';
-  const [totalAprovados, estatisticasPedidos] = await Promise.all([contarPrestadoresAprovados(), calcularEstatisticasPedidos(), carregarModeracao()]);
-  const maxCont = Math.max(...CONTAGEM_CATEGORIAS.map(c=>c.n));
+  const [totalAprovados, estatisticasPedidos, denuncias] = await Promise.all([contarPrestadoresAprovados(), calcularEstatisticasPedidos(), carregarModeracao(), carregarDenuncias()]).then(r => [r[0], r[1], r[3]]);
   document.getElementById('miolo-admin').innerHTML =
     '<div class="painel-cabecalho"><div><h1>Painel administrativo</h1><p>Visão para a UEM, cooperativas e prefeituras parceiras do CONECTA rural</p></div>'
       + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">'
@@ -1965,15 +2043,25 @@ async function renderPainelAdmin(){
       + cartaoEstat('Taxa de aceitação', estatisticasPedidos.taxaAceitacao, 'dado real')
     + '</div>'
     + '<div class="grade-painel">'
-      + '<div class="bloco-painel"><h2>Serviços mais buscados</h2>' + CONTAGEM_CATEGORIAS.map(c=>{
-          const pct = Math.round((c.n/maxCont)*100);
+      + '<div class="bloco-painel"><h2>Serviços mais buscados</h2>' + (estatisticasPedidos.categoriasReais.length ? estatisticasPedidos.categoriasReais.map(c=>{
+          const maxReal = Math.max(...estatisticasPedidos.categoriasReais.map(x=>x.n));
+          const pct = Math.round((c.n/maxReal)*100);
           return '<div class="barra-cat"><div class="topo"><span>'+catInfo(c.id).rot+'</span><span class="n">'+c.n+'</span></div><div class="trilha"><div class="prog" style="width:'+pct+'%"></div></div></div>';
-        }).join('') + '</div>'
-      + '<div class="bloco-painel"><h2>Prestadores por município</h2><table class="tabela-painel"><thead><tr><th>Município</th><th>Prestadores</th><th>Pedidos/mês</th></tr></thead><tbody>'
-        + MUNICIPIOS.map(m=>'<tr><td>'+m.nome+'</td><td>'+m.prestadores+'</td><td>'+m.pedidos+'</td></tr>').join('') + '</tbody></table></div>'
+        }).join('') : '<div class="legenda-muted">Ainda sem pedidos suficientes.</div>') + '</div>'
+      + '<div class="bloco-painel"><h2>Prestadores por município</h2><table class="tabela-painel"><thead><tr><th>Município</th><th>Prestadores</th><th>Pedidos</th></tr></thead><tbody>'
+        + estatisticasPedidos.municipiosReais.map(m=>'<tr><td>'+m.nome+'</td><td>'+m.prestadores+'</td><td>'+m.pedidos+'</td></tr>').join('') + '</tbody></table></div>'
     + '</div>'
+    + '<div class="bloco-painel"><h2>Denúncias recebidas</h2>' + (denuncias.length ? denuncias.map(d=>{
+        const alvo = d.tipo === 'prestador' ? ('Prestador #'+d.prestador_id) : ('Pedido #'+d.pedido_id);
+        return '<div class="item-mod"><div class="miolo"><div class="nome">'+alvo+' · '+d.tipo+'</div><div class="meta">'+escaparHTML(d.motivo)+'</div></div></div>';
+      }).join('') : '<div class="legenda-muted">Nenhuma denúncia recebida.</div>') + '</div>'
     + '<div class="bloco-painel"><h2>Cadastros aguardando aprovação</h2><div class="lista-moderacao" id="lista-moderacao"></div></div>';
   renderModeracao();
+}
+async function carregarDenuncias(){
+  const { data, error } = await sb.from('denuncias').select('*').order('criado_em', { ascending:false }).limit(30);
+  if(error){ console.error('Erro ao carregar denúncias:', error); return []; }
+  return data;
 }
 function cartaoEstat(rot, num, delta){ return '<div class="cartao-estat"><div class="rot">'+rot+'</div><div class="num">'+num+'</div><div class="delta">'+delta+'</div></div>'; }
 function renderModeracao(){
