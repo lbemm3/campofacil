@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CampoFácil · Versão web</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2F5233">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -66,6 +70,8 @@
     padding:40px 34px;
     text-align:center;
     box-shadow: var(--sombra);
+    max-height: 90vh;
+    overflow-y: auto;
   }
   .cartao-login .selo-grande{
     width:74px; height:74px; margin:0 auto 18px;
@@ -101,6 +107,16 @@
   .rodape-lateral button{ display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:12px; font-weight:700; font-size:13.5px; color: rgba(242,236,218,0.68); width:100%; text-align:left; }
   .rodape-lateral button svg{ width:17px; height:17px; }
   .rodape-lateral button:hover{ background: rgba(255,255,255,0.08); color:var(--branco); }
+  .rodape-parceiros{ margin-top:16px; padding-top:16px; border-top:1px dashed rgba(242,236,218,0.25); }
+  .rodape-parceiros .titulo-parceiros{ font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:rgba(242,236,218,0.55); margin-bottom:8px; }
+  .grade-parceiros{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .badge-parceiro{ aspect-ratio:1; border-radius:8px; background:rgba(255,255,255,0.08); color:rgba(242,236,218,0.85); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; overflow:hidden; }
+  .badge-parceiro img{ width:100%; height:100%; object-fit:contain; }
+  .rodape-deslizante{ display:none; overflow:hidden; background:var(--branco); border-top:1.5px solid var(--zinco-claro); padding:10px 0; }
+  @media (min-width:900px){ .rodape-deslizante{ display:block; } }
+  .trilha-deslizante{ display:flex; gap:40px; white-space:nowrap; width:max-content; animation: deslizar 28s linear infinite; }
+  .trilha-deslizante span{ font-size:12.5px; font-weight:700; color:var(--tinta-suave); text-transform:uppercase; letter-spacing:0.4px; }
+  @keyframes deslizar{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
 
   @media (min-width:900px){ .barra-lateral{ display:flex; } }
 
@@ -337,11 +353,11 @@
     </div>
     <div class="grupo-campo">
       <label for="input-email">E-mail</label>
-      <input id="input-email" type="email" placeholder="seuemail@exemplo.com" autocomplete="email">
+      <input id="input-email" type="email" placeholder="seuemail@exemplo.com" autocomplete="email" onkeydown="if(event.key==='Enter')entrarComEmail()">
     </div>
     <div class="grupo-campo">
       <label for="input-senha">Senha</label>
-      <input id="input-senha" type="password" placeholder="Sua senha" autocomplete="current-password">
+      <input id="input-senha" type="password" placeholder="Sua senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrarComEmail()">
     </div>
     <div id="mensagem-login" class="legenda-muted" style="min-height:0; margin-bottom:6px;"></div>
     <button class="botao botao-primario botao-bloco" onclick="entrarComEmail()">Entrar</button>
@@ -362,6 +378,11 @@
     <nav class="nav-lateral" id="nav-lateral"></nav>
     <div class="rodape-lateral">
       <button onclick="abrirAdmin()" id="btn-admin-lateral"></button>
+      <button onclick="sair()" id="btn-sair-lateral"></button>
+    </div>
+    <div class="rodape-parceiros">
+      <div class="titulo-parceiros">Apoio</div>
+      <div class="grade-parceiros" id="grade-parceiros"></div>
     </div>
   </aside>
 
@@ -375,7 +396,6 @@
         <span id="icone-busca-topo"></span>
         <input type="text" placeholder="Buscar serviço ou prestador" oninput="buscar(this.value)">
       </div>
-      <button class="sino-topo" id="sino-topo"></button>
     </header>
 
     <main class="area-conteudo">
@@ -383,6 +403,8 @@
       <section class="painel-tela" id="tela-pedidos"></section>
       <section class="painel-tela" id="tela-perfil"></section>
     </main>
+
+    <div class="rodape-deslizante"><div class="trilha-deslizante" id="trilha-deslizante"></div></div>
   </div>
 
   <nav class="nav-inferior-mobile" id="nav-inferior-mobile"></nav>
@@ -839,6 +861,31 @@ function renderNavegacao(){
     '<button data-aba="'+a.id+'" onclick="'+acao(a)+'">'+iconeInline(a.ic,20)+'<span>'+a.rot+'</span></button>'
   ).join('');
   document.getElementById('btn-admin-lateral').innerHTML = iconeInline('painel',17)+'<span>Painel administrativo</span>';
+  document.getElementById('btn-sair-lateral').innerHTML = iconeInline('sair',17)+'<span>Sair da conta</span>';
+  renderParceiros();
+}
+
+/* ======================= PARCEIROS / APOIADORES ======================= */
+// Edite esta lista com os nomes reais. Para usar uma logo de verdade em vez
+// da sigla, adicione "logoUrl: 'https://link-da-imagem'" no item.
+const PARCEIROS = [
+  { sigla:'UEM', nome:'UEM — Universidade Estadual de Maringá' },
+  { sigla:'CR', nome:'CONECTA Rural' },
+  { sigla:'COOP', nome:'Cooperativa parceira' },
+  { sigla:'SR', nome:'Sindicato Rural' },
+  { sigla:'PM', nome:'Prefeitura parceira' },
+];
+
+function badgeParceiroHTML(p){
+  if(p.logoUrl) return '<div class="badge-parceiro" title="'+p.nome+'"><img src="'+p.logoUrl+'" alt="'+p.nome+'"></div>';
+  return '<div class="badge-parceiro" title="'+p.nome+'">'+p.sigla+'</div>';
+}
+
+function renderParceiros(){
+  const grade = document.getElementById('grade-parceiros');
+  if(grade) grade.innerHTML = PARCEIROS.map(badgeParceiroHTML).join('');
+  const trilha = document.getElementById('trilha-deslizante');
+  if(trilha) trilha.innerHTML = PARCEIROS.concat(PARCEIROS).map(p=>'<span>'+p.nome+'</span>').join('');
 }
 
 function irParaInicio(){
@@ -2088,7 +2135,6 @@ document.getElementById('icone-login').innerHTML = iconeInline('logo', 34);
 document.getElementById('icone-marca-lateral').innerHTML = iconeInline('logo', 18);
 document.getElementById('icone-marca-topo').innerHTML = iconeInline('logo', 16);
 document.getElementById('icone-busca-topo').innerHTML = iconeInline('busca', 17);
-document.getElementById('sino-topo').innerHTML = iconeInline('sino', 18);
 document.getElementById('icone-fechar-modal').innerHTML = iconeInline('fechar', 16);
 document.getElementById('btn-voltar-admin').innerHTML = iconeInline('voltar', 15) + '<span>Voltar ao app</span>';
 document.getElementById('camada-modal').addEventListener('click', function(e){ if(e.target === this) fecharModal(); });
